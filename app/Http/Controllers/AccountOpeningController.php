@@ -645,12 +645,12 @@ class AccountOpeningController extends Controller
             ->filter()
             ->first(fn ($data) => filled($data['direccion'] ?? null));
 
-        $fullName = trim(($opening->member_first_names ?? '').' '.($opening->member_last_names ?? ''));
-        $fullName = $fullName !== '' ? $fullName : ($cedulaData['nombres_apellidos'] ?? '');
+        $fullName = $this->singleLine(trim(($opening->member_first_names ?? '').' '.($opening->member_last_names ?? '')));
+        $fullName = $fullName !== '' ? $fullName : $this->singleLine($cedulaData['nombres_apellidos'] ?? '');
 
         return [
             'apellidos_nombres' => $fullName,
-            'cedula_identidad' => $opening->member_identification ?: ($cedulaData['cedula'] ?? ''),
+            'cedula_identidad' => $this->documentIdentityNumber($opening, $cedulaData),
             'nacionalidad' => $opening->member_nationality ?: ($cedulaData['nacionalidad'] ?? ''),
             'direccion' => $opening->member_address ?: ($planillaData['direccion'] ?? ''),
             'codigo_socio' => $opening->file_name,
@@ -694,14 +694,43 @@ class AccountOpeningController extends Controller
 
     private function persistCorrectedMemberData(AccountOpening $opening, array $data): void
     {
-        $fullName = trim($data['apellidos_nombres']);
+        $fullName = $this->singleLine($data['apellidos_nombres']);
 
         $opening->update([
-            'member_identification' => $data['cedula_identidad'],
+            'member_identification' => preg_replace('/\D+/', '', $data['cedula_identidad']) ?: null,
             'member_first_names' => $fullName,
             'member_last_names' => null,
             'member_address' => $data['direccion'] ?? $opening->member_address,
         ]);
+    }
+
+    private function documentIdentityNumber(AccountOpening $opening, ?array $cedulaData): string
+    {
+        $candidate = preg_replace('/\D+/', '', (string) $opening->member_identification);
+        if (strlen($candidate) === 10) {
+            return $candidate;
+        }
+
+        $candidate = preg_replace('/\D+/', '', (string) ($cedulaData['cedula'] ?? ''));
+        if (strlen($candidate) === 10) {
+            return $candidate;
+        }
+
+        foreach ($opening->documents->where('document_scope', 'requisito') as $document) {
+            $candidate = preg_replace('/\D+/', '', (string) ($document->extracted_data['cedula'] ?? ''));
+            if (strlen($candidate) === 10) {
+                return $candidate;
+            }
+        }
+
+        return '';
+    }
+
+    private function singleLine(?string $value): string
+    {
+        $value = trim((string) $value);
+
+        return preg_replace('/\s+/u', ' ', $value) ?? $value;
     }
 
     private function makePdfFromJpeg(string $jpeg): string

@@ -72,7 +72,7 @@ class InternalDocumentPdfService
         $pdf->Text(183, 51.8, $this->pdfText($this->shortYear($fields['anio'] ?? now()->format('Y'))));
 
         $pdf->Text(34, 90.5, $this->pdfText($fields['apellidos_nombres'] ?? ''));
-        $pdf->Text(57, 99.2, $this->pdfText($fields['cedula_identidad'] ?? ''));
+        $pdf->Text(57, 99.2, $this->pdfText($this->digitsOnly($fields['cedula_identidad'] ?? '')));
 
         if (($fields['tipo_solicitante'] ?? 'socio') === 'socio') {
             $pdf->Text(166.5, 114.8, 'X');
@@ -89,12 +89,12 @@ class InternalDocumentPdfService
 
     private function fillRegistroFirmas(Fpdi $pdf, array $fields): void
     {
-        $pdf->SetFont('Helvetica', 'B', 9);
-        $pdf->Text(76, 32, $this->pdfText($fields['codigo_socio'] ?? ''));
-        $pdf->Text(76, 42, $this->pdfText($fields['cuenta_numero'] ?? ''));
-        $pdf->Text(76, 51, $this->pdfText($fields['apellidos_nombres'] ?? ''));
-        $pdf->Text(76, 61, $this->pdfText($fields['cedula_identidad'] ?? ''));
-        $pdf->Text(76, 70, $this->pdfText($fields['tipo_cuenta'] ?? ''));
+        $pdf->SetFont('Helvetica', 'B', 8);
+        $pdf->Text(84, 34.2, $this->pdfText($fields['codigo_socio'] ?? ''));
+        $pdf->Text(84, 43.8, $this->pdfText($fields['cuenta_numero'] ?? ''));
+        $pdf->Text(84, 53.4, $this->pdfText($fields['apellidos_nombres'] ?? ''));
+        $pdf->Text(84, 63.0, $this->pdfText($this->digitsOnly($fields['cedula_identidad'] ?? '')));
+        $pdf->Text(84, 72.6, $this->pdfText($fields['tipo_cuenta'] ?? ''));
     }
 
     private function fillGenericStoredFormat(Fpdi $pdf, array $fields): void
@@ -129,5 +129,10 @@ class InternalDocumentPdfService
         $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
 
         return iconv('UTF-8', 'windows-1252//TRANSLIT', $value) ?: $value;
+    }
+
+    private function digitsOnly(string $value): string
+    {
+        return preg_replace('/\D+/', '', $value) ?? '';
     }
 }
