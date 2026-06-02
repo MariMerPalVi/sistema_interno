@@ -67,23 +67,23 @@ class InternalDocumentPdfService
     {
         $pdf->SetFont('Helvetica', 'B', 7);
         $pdf->Text(70, 51.8, $this->pdfText($fields['ciudad'] ?? 'Las Naves'));
-        $pdf->Text(124, 51.8, $this->pdfText($fields['dia'] ?? now()->format('d')));
-        $pdf->Text(145, 51.8, $this->pdfText($fields['mes'] ?? now()->format('m')));
-        $pdf->Text(190, 51.8, $this->pdfText($this->shortYear($fields['anio'] ?? now()->format('Y'))));
+        $pdf->Text(126, 51.8, $this->pdfText($fields['dia'] ?? now()->format('d')));
+        $pdf->Text(146, 51.8, $this->pdfText($fields['mes'] ?? now()->format('m')));
+        $pdf->Text(183, 51.8, $this->pdfText($this->shortYear($fields['anio'] ?? now()->format('Y'))));
 
-        $pdf->Text(46, 90.5, $this->pdfText($fields['apellidos_nombres'] ?? ''));
-        $pdf->Text(63, 97.8, $this->pdfText($fields['cedula_identidad'] ?? ''));
+        $pdf->Text(34, 90.5, $this->pdfText($fields['apellidos_nombres'] ?? ''));
+        $pdf->Text(57, 99.2, $this->pdfText($fields['cedula_identidad'] ?? ''));
 
         if (($fields['tipo_solicitante'] ?? 'socio') === 'socio') {
-            $pdf->Text(157.5, 113.2, 'X');
+            $pdf->Text(166.5, 114.8, 'X');
         } else {
-            $pdf->Text(179, 113.2, 'X');
+            $pdf->Text(189.5, 114.8, 'X');
         }
 
         if (($fields['fondo_mortuorio'] ?? 'no') === 'si') {
-            $pdf->Text(23.5, 136.8, 'X');
+            $pdf->Text(20.5, 137.6, 'X');
         } else {
-            $pdf->Text(23.5, 154.8, 'X');
+            $pdf->Text(20.5, 155.4, 'X');
         }
     }
 
@@ -126,6 +126,7 @@ class InternalDocumentPdfService
     private function pdfText(string $value): string
     {
         $value = trim($value);
+        $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
 
         return iconv('UTF-8', 'windows-1252//TRANSLIT', $value) ?: $value;
     }
