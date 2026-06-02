@@ -11,6 +11,9 @@ class InternalDocumentPdfService
 {
     public function generate(AccountOpening $opening, InternalDocumentTemplate $template, array $fields): string
     {
+        $opening->loadMissing('documents');
+        $fields = $this->normalizeFields($opening, $fields);
+
         $templateFile = public_path($template->template_path);
         if (!is_file($templateFile)) {
             abort(404, 'No se encontro el formato PDF almacenado.');
@@ -65,14 +68,13 @@ class InternalDocumentPdfService
 
     private function fillSolicitudIngreso(Fpdi $pdf, array $fields): void
     {
-        $pdf->SetFont('Helvetica', 'B', 7);
-        $pdf->Text(70, 51.8, $this->pdfText($fields['ciudad'] ?? 'Las Naves'));
-        $pdf->Text(126, 51.8, $this->pdfText($fields['dia'] ?? now()->format('d')));
-        $pdf->Text(146, 51.8, $this->pdfText($fields['mes'] ?? now()->format('m')));
-        $pdf->Text(183, 51.8, $this->pdfText($this->shortYear($fields['anio'] ?? now()->format('Y'))));
+        $this->fieldText($pdf, 70, 51.8, $fields['ciudad'] ?? 'Las Naves', 36, 7);
+        $this->fieldText($pdf, 126, 51.8, $fields['dia'] ?? now()->format('d'), 9, 7);
+        $this->fieldText($pdf, 146, 51.8, $fields['mes'] ?? now()->format('m'), 28, 7);
+        $this->fieldText($pdf, 183, 51.8, $this->shortYear($fields['anio'] ?? now()->format('Y')), 8, 7);
 
-        $pdf->Text(34, 90.5, $this->pdfText($fields['apellidos_nombres'] ?? ''));
-        $pdf->Text(57, 99.2, $this->pdfText($this->digitsOnly($fields['cedula_identidad'] ?? '')));
+        $this->fieldText($pdf, 31, 90.5, $fields['apellidos_nombres'] ?? '', 126, 7);
+        $this->fieldText($pdf, 47, 99.2, $this->digitsOnly($fields['cedula_identidad'] ?? ''), 42, 7);
 
         if (($fields['tipo_solicitante'] ?? 'socio') === 'socio') {
             $pdf->Text(166.5, 114.8, 'X');
@@ -89,12 +91,11 @@ class InternalDocumentPdfService
 
     private function fillRegistroFirmas(Fpdi $pdf, array $fields): void
     {
-        $pdf->SetFont('Helvetica', 'B', 8);
-        $pdf->Text(84, 34.2, $this->pdfText($fields['codigo_socio'] ?? ''));
-        $pdf->Text(84, 43.8, $this->pdfText($fields['cuenta_numero'] ?? ''));
-        $pdf->Text(84, 53.4, $this->pdfText($fields['apellidos_nombres'] ?? ''));
-        $pdf->Text(84, 63.0, $this->pdfText($this->digitsOnly($fields['cedula_identidad'] ?? '')));
-        $pdf->Text(84, 72.6, $this->pdfText($fields['tipo_cuenta'] ?? ''));
+        $this->fieldText($pdf, 82, 35.4, $fields['codigo_socio'] ?? '', 105, 8);
+        $this->fieldText($pdf, 82, 45.0, $fields['cuenta_numero'] ?? '', 105, 8);
+        $this->fieldText($pdf, 82, 54.7, $fields['apellidos_nombres'] ?? '', 105, 8);
+        $this->fieldText($pdf, 82, 64.3, $this->digitsOnly($fields['cedula_identidad'] ?? ''), 105, 8);
+        $this->fieldText($pdf, 82, 73.9, $fields['tipo_cuenta'] ?? '', 105, 8);
     }
 
     private function fillGenericStoredFormat(Fpdi $pdf, array $fields): void
@@ -134,5 +135,52 @@ class InternalDocumentPdfService
     private function digitsOnly(string $value): string
     {
         return preg_replace('/\D+/', '', $value) ?? '';
+    }
+
+    private function fieldText(Fpdi $pdf, float $x, float $y, string $value, float $maxWidth, int $fontSize): void
+    {
+        $value = $this->pdfText($value);
+        $size = $fontSize;
+
+        do {
+            $pdf->SetFont('Helvetica', 'B', $size);
+            $fits = $pdf->GetStringWidth($value) <= $maxWidth;
+            if ($fits || $size <= 5) {
+                break;
+            }
+            $size--;
+        } while (true);
+
+        $pdf->Text($x, $y, $value);
+    }
+
+    private function normalizeFields(AccountOpening $opening, array $fields): array
+    {
+        $fields['apellidos_nombres'] = $this->singleLine($fields['apellidos_nombres'] ?? '');
+
+        $id = $this->digitsOnly((string) ($fields['cedula_identidad'] ?? ''));
+        if (strlen($id) !== 10) {
+            $id = $this->digitsOnly((string) $opening->member_identification);
+        }
+        if (strlen($id) !== 10) {
+            foreach ($opening->documents as $document) {
+                $candidate = $this->digitsOnly((string) ($document->extracted_data['cedula'] ?? ''));
+                if (strlen($candidate) === 10) {
+                    $id = $candidate;
+                    break;
+                }
+            }
+        }
+
+        $fields['cedula_identidad'] = strlen($id) === 10 ? $id : '';
+
+        return $fields;
+    }
+
+    private function singleLine(string $value): string
+    {
+        $value = trim($value);
+
+        return preg_replace('/\s+/u', ' ', $value) ?? $value;
     }
 }

@@ -645,8 +645,9 @@ class AccountOpeningController extends Controller
             ->filter()
             ->first(fn ($data) => filled($data['direccion'] ?? null));
 
-        $fullName = $this->singleLine(trim(($opening->member_first_names ?? '').' '.($opening->member_last_names ?? '')));
-        $fullName = $fullName !== '' ? $fullName : $this->singleLine($cedulaData['nombres_apellidos'] ?? '');
+        $memberName = $this->singleLine(trim(($opening->member_first_names ?? '').' '.($opening->member_last_names ?? '')));
+        $extractedName = $this->singleLine($cedulaData['nombres_apellidos'] ?? '');
+        $fullName = mb_strlen($extractedName) > mb_strlen($memberName) ? $extractedName : $memberName;
 
         return [
             'apellidos_nombres' => $fullName,
