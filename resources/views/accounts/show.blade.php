@@ -266,7 +266,7 @@
                         $isBdh = str_contains($template->slug, 'bdh') || str_contains($template->slug, 'acreditacion') || str_contains($template->slug, 'reapertura') || str_contains($template->slug, 'cierre');
                     @endphp
                     <dialog class="data-dialog" id="internal-template-{{ $template->id }}">
-                        <form method="post" action="{{ route('accounts.internal.generate', [$opening, $template]) }}">
+                        <form method="post" action="{{ route('accounts.internal.generate', [$opening, $template]) }}" target="_blank">
                             @csrf
                             <div class="dialog-head">
                                 <div>
@@ -342,7 +342,7 @@
                                 @endif
                             </div>
                             <div class="actions">
-                                <button class="button primary" type="submit">Generar PDF lleno</button>
+                                <button class="button primary" type="submit">Abrir documento editable</button>
                                 <button class="button ghost" type="button" data-dialog-close>Cancelar</button>
                             </div>
                         </form>

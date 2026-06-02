@@ -331,14 +331,16 @@ class AccountOpeningController extends Controller
 
         $this->persistCorrectedMemberData($opening, $data);
 
-        $pdf = app(InternalDocumentPdfService::class)->generate($opening->fresh('accountType'), $template, $data);
+        $opening = $opening->fresh('accountType');
         $downloadName = $this->downloadFileName($template, $opening).'.pdf';
 
         $this->audit($opening, 'generar_documento_interno', "Documento generado para descarga: {$template->name}.");
 
-        return response($pdf, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$downloadName.'"',
+        return view('accounts.generated-documents.show', [
+            'opening' => $opening,
+            'template' => $template,
+            'fields' => $data,
+            'downloadName' => $downloadName,
         ]);
     }
 
