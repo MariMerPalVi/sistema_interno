@@ -72,6 +72,56 @@
             box-shadow: 0 14px 36px rgba(15, 23, 42, .18);
         }
 
+        .page.pdf-template {
+            height: 297mm;
+            min-height: 297mm;
+            padding: 0;
+        }
+
+        .pdf-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            pointer-events: none;
+            background: #fff;
+        }
+
+        .pdf-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+        }
+
+        .pdf-field {
+            position: absolute;
+            min-height: 4mm;
+            padding: 0 .8mm;
+            border: 0;
+            background: transparent;
+            color: #161d26;
+            font-size: 9px;
+            font-weight: 800;
+            line-height: 1.1;
+            outline: none;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .pdf-check {
+            position: absolute;
+            width: 5mm;
+            height: 5mm;
+            color: #161d26;
+            font-size: 11px;
+            font-weight: 900;
+            line-height: 5mm;
+            text-align: center;
+            outline: none;
+        }
+
         .brand-row {
             display: flex;
             align-items: flex-start;
@@ -258,12 +308,14 @@
         <button type="button" onclick="window.close()">Cerrar</button>
     </div>
 
-    <main class="page">
-        <div class="watermark"></div>
-        <div class="brand-row">
-            <img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
-            <div class="brand-line"></div>
-        </div>
+    <main class="page {{ $isApplication ? 'pdf-template' : '' }}">
+        @unless ($isApplication)
+            <div class="watermark"></div>
+            <div class="brand-row">
+                <img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
+                <div class="brand-line"></div>
+            </div>
+        @endunless
 
         @if ($isSignatureRegister)
             <h1 style="text-align: left; margin-bottom: 8mm;">REGISTRO DE FIRMAS</h1>
@@ -314,48 +366,21 @@
                 <tr><td>Asistente Operativo</td><td>Fecha</td></tr>
             </table>
         @elseif ($isApplication)
-            <h1>SOLICITUD DE INGRESO</h1>
-            <p class="letter-date">
-                <span class="editable medium" contenteditable="true">{{ $city }}</span>,
-                <span class="editable short" contenteditable="true">{{ $day }}</span>
-                de <span class="editable medium" contenteditable="true">{{ $month }}</span>
-                del 202<span class="editable short" contenteditable="true">{{ $yearSuffix }}</span>
-            </p>
+            <embed class="pdf-bg" src="{{ asset('formatos/Fondo.pdf') }}#toolbar=0&navpanes=0&scrollbar=0" type="application/pdf">
+            <section class="pdf-layer" aria-label="Campos editables sobre formato institucional">
+                <span class="pdf-field" contenteditable="true" style="left: 70mm; top: 47.5mm; width: 40mm;">{{ $city }}</span>
+                <span class="pdf-field" contenteditable="true" style="left: 122mm; top: 47.5mm; width: 12mm; text-align: center;">{{ $day }}</span>
+                <span class="pdf-field" contenteditable="true" style="left: 145mm; top: 47.5mm; width: 28mm; text-align: center;">{{ $month }}</span>
+                <span class="pdf-field" contenteditable="true" style="left: 191mm; top: 47.5mm; width: 8mm; text-align: center;">{{ $yearSuffix }}</span>
 
-            <p>Señores</p>
-            <p><strong>CONSEJO DE ADMINISTRACIÓN DE LA COAC LAS NAVES</strong></p>
-            <p style="margin-bottom: 16mm;">Presente. -</p>
+                <span class="pdf-field" contenteditable="true" style="left: 32mm; top: 108mm; width: 128mm;">{{ $fullName }}</span>
+                <span class="pdf-field" contenteditable="true" style="left: 54mm; top: 116.5mm; width: 34mm; text-align: center;">{{ $identification }}</span>
 
-            <p>
-                Yo,
-                <span class="editable long" contenteditable="true">{{ $fullName }}</span>,
-                portador de la cédula N°
-                <span class="editable medium" contenteditable="true">{{ $identification }}</span>,
-                ante ustedes muy respetuosamente comparezco y solicito.
-            </p>
-
-            <p>
-                Se sirvan aceptar la presente solicitud de ingreso en calidad de
-                SOCIO <span class="check" contenteditable="true">{{ $requestType === 'socio' ? 'X' : '' }}</span>
-                CLIENTE <span class="check" contenteditable="true">{{ $requestType === 'cliente' ? 'X' : '' }}</span>
-                a la COAC LAS NAVES, comprometiéndome a cumplir la Ley Orgánica Economía Popular Solidaria, el Sector Financiero, el Reglamento de la Presente Ley, los estatutos y demás reglamentos internos de la misma.
-            </p>
-
-            <p>
-                <span class="check" contenteditable="true">{{ $mortuaryFund === 'si' ? 'X' : '' }}</span>
-                Solicito ser beneficiario del fondo mortuorio y acogerme a las políticas establecidas por la Institución.
-            </p>
-            <p>
-                <span class="check" contenteditable="true">{{ $mortuaryFund === 'no' ? 'X' : '' }}</span>
-                Solicito no ser beneficiario del fondo mortuorio.
-            </p>
-
-            <p style="margin-top: 8mm;">Por la atención que se sirvan dar a la presente, anticipo mis agradecimientos.</p>
-
-            <div class="signature">
-                <span>SOLICITANTE</span>
-            </div>
-            <div class="footer-strip"></div>
+                <span class="pdf-check" contenteditable="true" style="left: 170.5mm; top: 134.2mm;">{{ $requestType === 'socio' ? 'X' : '' }}</span>
+                <span class="pdf-check" contenteditable="true" style="left: 192.5mm; top: 134.2mm;">{{ $requestType === 'cliente' ? 'X' : '' }}</span>
+                <span class="pdf-check" contenteditable="true" style="left: 21.5mm; top: 156.6mm;">{{ $mortuaryFund === 'si' ? 'X' : '' }}</span>
+                <span class="pdf-check" contenteditable="true" style="left: 21.5mm; top: 175mm;">{{ $mortuaryFund === 'no' ? 'X' : '' }}</span>
+            </section>
         @else
             <h1>{{ strtoupper($template->name) }}</h1>
             <section class="generic-box">
