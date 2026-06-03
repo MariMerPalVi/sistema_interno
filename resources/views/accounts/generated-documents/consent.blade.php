@@ -333,11 +333,7 @@
                     <li><strong>Conservacion:</strong> Los datos personales deben ser conservados solo durante el tiempo necesario para cumplir con la finalidad para la cual fueron recogidos.</li>
                     <li><strong>Seguridad de datos personales:</strong> Los responsables del tratamiento deben implementar medidas tecnicas y organizativas para garantizar la seguridad de los datos personales y prevenir su acceso no autorizado, perdida o destruccion.</li>
                 </ul>
-            </section>
-        </article>
 
-        <article class="sheet">
-            <section class="content">
                 <div class="section-title">2. Finalidad del Tratamiento de Datos Personales</div>
                 <p>Los datos personales que usted proporcione seran tratados para las siguientes finalidades:</p>
                 <p><strong>Finalidades necesarias (no requieren consentimiento):</strong></p>
@@ -353,7 +349,11 @@
                     <li>Uso de imagen para fines publicitarios.</li>
                 </ul>
                 <p>El titular podra aceptar o rechazar las finalidades opcionales, sin que ello afecte la prestacion de los servicios principales ofrecidos por la Cooperativa.</p>
+            </section>
+        </article>
 
+        <article class="sheet">
+            <section class="content">
                 <div class="section-title">3. Tipos de Datos Personales Recolectados</div>
                 <ul class="list">
                     <li><strong>Datos personales:</strong> Nombres, Apellidos, cedula de identidad, codigo dactilar, fecha de nacimiento, edad, lugar de nacimiento, estado civil, etc.</li>
@@ -382,11 +382,7 @@
                     <li><strong>Revocacion del consentimiento:</strong> Revocar su consentimiento en cualquier momento, sin que esto afecte la legalidad del tratamiento realizado antes de la revocacion.</li>
                     <li><strong>No ser objeto de decisiones automatizadas:</strong> No ser sometido a decisiones basadas unicamente en valoraciones automatizadas.</li>
                 </ul>
-            </section>
-        </article>
 
-        <article class="sheet">
-            <section class="content">
                 <div class="section-title">6. Procedimiento para Ejercer sus Derechos</div>
                 <p>Para ejercer sus derechos, puede presentar una solicitud por escrito o por correo electronico dirigido al Responsable del Tratamiento de Datos Personales y al Delegado de Proteccion de Datos (DPO), indicando claramente el derecho que desea ejercer. La solicitud debe incluir:</p>
                 <ul class="list">
@@ -398,7 +394,11 @@
 
                 <div class="section-title">7. Transferencia de Datos Personales</div>
                 <p>Sus datos personales podran ser transferidos a terceros unicamente en los casos permitidos por la Ley y para las finalidades descritas en este documento. En caso de transferencias internacionales, se garantizara que los destinatarios cumplan con los estandares de proteccion de datos establecidos en la LOPDP.</p>
+            </section>
+        </article>
 
+        <article class="sheet">
+            <section class="content">
                 <div class="section-title">8. Plazo de Conservacion de los Datos</div>
                 <p>Sus datos personales seran conservados durante el tiempo necesario para cumplir con las finalidades descritas en el presente documento, asi como para atender obligaciones legales, regulatorias y contractuales aplicables.</p>
                 <ul class="list">
@@ -415,11 +415,7 @@
                     <li>Control de acceso restringido a personal autorizado.</li>
                     <li>Auditorias periodicas de los sistemas de informacion.</li>
                 </ul>
-            </section>
-        </article>
 
-        <article class="sheet">
-            <section class="content">
                 <div class="section-title">10. Consentimiento</div>
                 <p>El tratamiento de sus datos personales necesario para la gestion de la relacion contractual, evaluacion crediticia y cumplimiento de obligaciones legales no requiere su consentimiento, conforme a la normativa aplicable.</p>
                 <p>Usted podra otorgar o negar su consentimiento para las siguientes finalidades opcionales:</p>
