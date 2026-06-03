@@ -73,42 +73,11 @@
             <h2>Consentimiento de datos personales</h2>
             @include('partials.badge', ['status' => optional($opening->consent)->status ?? 'pendiente'])
         </div>
-        <p>Ingrese los datos del consentimiento, genere el documento editable, imprimalo, obtenga la firma del socio y cargue el documento firmado.</p>
-        <form class="document-data-form" method="get" action="{{ route('accounts.consent.edit', $opening) }}" target="_blank">
-            <div class="form-grid">
-                <label>
-                    Apellidos y nombres
-                    <input name="apellidos_nombres" value="{{ $consentDefaults['apellidos_nombres'] }}" required>
-                </label>
-                <label>
-                    Cedula de identidad
-                    <input name="cedula_identidad" value="{{ $consentDefaults['cedula_identidad'] }}" maxlength="10" required>
-                </label>
-                <label>
-                    Ciudad
-                    <input name="ciudad" value="{{ $consentDefaults['ciudad'] }}" required>
-                </label>
-                <label>
-                    Tipo de cuenta
-                    <input name="tipo_cuenta" value="{{ $consentDefaults['tipo_cuenta'] }}" required>
-                </label>
-                <label>
-                    Dia
-                    <input name="dia" value="{{ $consentDefaults['dia'] }}" maxlength="2" required>
-                </label>
-                <label>
-                    Mes
-                    <input name="mes" value="{{ $consentDefaults['mes'] }}" required>
-                </label>
-                <label>
-                    Anio
-                    <input name="anio" value="{{ $consentDefaults['anio'] }}" maxlength="4" required>
-                </label>
-            </div>
-            <div class="toolbar">
-                <button class="button secondary" type="submit">Abrir consentimiento editable</button>
-            </div>
-        </form>
+        <p>Abra el consentimiento editable, complete los datos directamente en el formato institucional, imprimalo, obtenga la firma del socio y cargue el documento firmado.</p>
+        <div class="toolbar">
+            <a class="button secondary" href="{{ route('accounts.consent.edit', $opening) }}" target="_blank">Abrir consentimiento editable</a>
+            <a class="button ghost" href="{{ asset('formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf') }}" target="_blank">Ver formato original</a>
+        </div>
         <div class="toolbar">
             @if ($consentComplete)
                 <a class="button ghost" href="{{ route('accounts.consent.preview', $opening) }}" target="_blank">Previsualizar documento cargado</a>
