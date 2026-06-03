@@ -10,6 +10,7 @@ Route::prefix('aperturas')->name('accounts.')->group(function () {
     Route::get('/crear/{accountType?}', [AccountOpeningController::class, 'create'])->name('create');
     Route::post('/', [AccountOpeningController::class, 'store'])->name('store');
     Route::get('/{opening}', [AccountOpeningController::class, 'show'])->name('show');
+    Route::get('/{opening}/consentimiento/editar', [AccountOpeningController::class, 'editConsentDocument'])->name('consent.edit');
     Route::get('/{opening}/consentimiento/ver', [AccountOpeningController::class, 'previewConsent'])->name('consent.preview');
     Route::get('/{opening}/consentimiento', fn ($opening) => redirect()->route('accounts.show', [$opening, 'paso' => 'consentimiento']));
     Route::get('/{opening}/documentos', fn ($opening) => redirect()->route('accounts.show', [$opening, 'paso' => 'requisitos']));

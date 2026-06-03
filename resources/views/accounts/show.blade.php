@@ -75,7 +75,7 @@
         </div>
         <p>Descargue el formato, imprimalo, obtenga la firma del socio y cargue el documento firmado.</p>
         <div class="toolbar">
-            <a class="button secondary" href="{{ asset('formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf') }}" target="_blank">Descargar formato</a>
+            <a class="button secondary" href="{{ route('accounts.consent.edit', $opening) }}" target="_blank">Abrir consentimiento editable</a>
             @if ($consentComplete)
                 <a class="button ghost" href="{{ route('accounts.consent.preview', $opening) }}" target="_blank">Previsualizar documento cargado</a>
                 <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'requisitos']) }}">Continuar</a>

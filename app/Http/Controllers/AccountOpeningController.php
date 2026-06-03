@@ -108,6 +108,16 @@ class AccountOpeningController extends Controller
         return back()->with('success', 'Datos del socio guardados.');
     }
 
+    public function editConsentDocument(AccountOpening $opening)
+    {
+        $opening->load(['accountType', 'documents']);
+
+        return view('accounts.generated-documents.consent', [
+            'opening' => $opening,
+            'fields' => $this->documentDownloadDefaults($opening),
+        ]);
+    }
+
     public function updateSpouseRequirement(Request $request, AccountOpening $opening)
     {
         $opening->update([
