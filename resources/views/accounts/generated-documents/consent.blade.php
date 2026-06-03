@@ -407,7 +407,11 @@
                     <li>Control de acceso restringido a personal autorizado.</li>
                     <li>Auditorias periodicas de los sistemas de informacion.</li>
                 </ul>
+            </section>
+        </article>
 
+        <article class="sheet">
+            <section class="content">
                 <div class="section-title">10. Consentimiento</div>
                 <p>El tratamiento de sus datos personales necesario para la gestion de la relacion contractual, evaluacion crediticia y cumplimiento de obligaciones legales no requiere su consentimiento, conforme a la normativa aplicable.</p>
                 <p>Usted podra otorgar o negar su consentimiento para las siguientes finalidades opcionales:</p>
@@ -417,11 +421,7 @@
                     <div class="check-row"><span class="box editable" contenteditable="true"></span><span>Uso de imagen para fines publicitarios.</span></div>
                 </div>
                 <p>En caso de tratamiento de datos personales sensibles, se solicitara su consentimiento explicito de manera independiente cuando corresponda. La negativa a otorgar el consentimiento para finalidades no necesarias no afectara la prestacion de los servicios principales ofrecidos por la Cooperativa.</p>
-            </section>
-        </article>
 
-        <article class="sheet">
-            <section class="content">
                 <div class="section-title">11. Revocacion del Consentimiento</div>
                 <p>Usted puede revocar su consentimiento en cualquier momento, presentando una solicitud por escrito al Responsable del Tratamiento de Datos Personales y al Delegado de Proteccion de Datos (DPO). La revocacion no tendra efectos retroactivos.</p>
 
