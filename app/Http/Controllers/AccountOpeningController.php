@@ -17,7 +17,6 @@ use App\Models\SelectedAdditionalService;
 use App\Models\UploadedDocument;
 use App\Services\AutomatedReviewService;
 use App\Services\DocumentExtractionService;
-use App\Services\InternalDocumentPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -314,22 +313,27 @@ class AccountOpeningController extends Controller
                 ->withErrors('Este documento no tiene formato descargable configurado.');
         }
 
-        $data = $request->validate([
-            'apellidos_nombres' => ['required', 'string', 'max:160'],
-            'cedula_identidad' => ['required', 'string', 'max:20'],
-            'cuenta_numero' => ['nullable', 'string', 'max:60'],
-            'codigo_socio' => ['nullable', 'string', 'max:60'],
-            'tipo_cuenta' => ['nullable', 'string', 'max:120'],
-            'direccion' => ['nullable', 'string', 'max:220'],
-            'ciudad' => ['nullable', 'string', 'max:80'],
-            'dia' => ['nullable', 'string', 'max:2'],
-            'mes' => ['nullable', 'string', 'max:20'],
-            'anio' => ['nullable', 'string', 'max:4'],
-            'tipo_solicitante' => ['nullable', Rule::in(['socio', 'cliente'])],
-            'fondo_mortuorio' => ['nullable', Rule::in(['si', 'no'])],
-        ]);
+        $data = array_merge(
+            $this->documentDownloadDefaults($opening),
+            $request->only([
+                'apellidos_nombres',
+                'cedula_identidad',
+                'cuenta_numero',
+                'codigo_socio',
+                'tipo_cuenta',
+                'direccion',
+                'ciudad',
+                'dia',
+                'mes',
+                'anio',
+                'tipo_solicitante',
+                'fondo_mortuorio',
+            ])
+        );
 
-        $this->persistCorrectedMemberData($opening, $data);
+        if (filled($data['apellidos_nombres'] ?? null) || filled($data['cedula_identidad'] ?? null)) {
+            $this->persistCorrectedMemberData($opening, $data);
+        }
 
         $opening = $opening->fresh('accountType');
         $downloadName = $this->downloadFileName($template, $opening).'.pdf';

@@ -474,40 +474,6 @@ a:hover { text-decoration: underline; }
   gap: 14px;
 }
 
-.data-dialog {
-  width: min(760px, calc(100vw - 34px));
-  max-height: min(84vh, 760px);
-  padding: 0;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 24px 70px rgba(7, 24, 39, .28);
-}
-
-.data-dialog::backdrop {
-  background: rgba(7, 24, 39, .48);
-}
-
-.data-dialog form {
-  display: grid;
-  gap: 16px;
-  padding: 22px;
-}
-
-.dialog-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid #e4eef4;
-}
-
-.dialog-head h3 {
-  margin: 8px 0 0;
-  font-size: 24px;
-}
-
 label {
   display: grid;
   gap: 6px;

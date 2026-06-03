@@ -237,7 +237,7 @@
                         <h3>{{ $template->name }}</h3>
                         <span class="status">{{ $template->source === 'econx' ? 'ECONX' : 'MANUAL' }}</span>
                         @if ($template->template_path)
-                            <button class="link-button" type="button" data-dialog-target="internal-template-{{ $template->id }}">Preparar descarga</button>
+                            <a href="{{ route('accounts.internal.generate', [$opening, $template]) }}" target="_blank">Abrir documento editable</a>
                         @else
                             <span class="hint">Formato pendiente de adjuntar</span>
                         @endif
@@ -259,95 +259,6 @@
                         <button class="button secondary" type="submit">{{ $doc ? 'Reemplazar' : 'Subir' }}</button>
                     </form>
                 </article>
-                @if ($template->template_path)
-                    @php
-                        $isSolicitud = str_contains($template->slug, 'solicitud-de-ingreso');
-                        $isRegistro = str_contains($template->slug, 'registro-de-firmas');
-                        $isBdh = str_contains($template->slug, 'bdh') || str_contains($template->slug, 'acreditacion') || str_contains($template->slug, 'reapertura') || str_contains($template->slug, 'cierre');
-                    @endphp
-                    <dialog class="data-dialog" id="internal-template-{{ $template->id }}">
-                        <form method="post" action="{{ route('accounts.internal.generate', [$opening, $template]) }}" target="_blank">
-                            @csrf
-                            <div class="dialog-head">
-                                <div>
-                                    <span class="status">DATOS REQUERIDOS</span>
-                                    <h3>{{ $template->name }}</h3>
-                                </div>
-                                <button class="icon-button" type="button" data-dialog-close aria-label="Cerrar">x</button>
-                            </div>
-                            <p class="hint">Revise la informacion extraida de la cedula. Corrija lo necesario antes de generar el PDF para firma.</p>
-                            <div class="form-grid">
-                                <label>
-                                    Apellidos y nombres
-                                    <input name="apellidos_nombres" value="{{ old('apellidos_nombres', $documentDefaults['apellidos_nombres']) }}" required>
-                                </label>
-                                <label>
-                                    Cedula de identidad
-                                    <input name="cedula_identidad" value="{{ old('cedula_identidad', $documentDefaults['cedula_identidad']) }}" required>
-                                </label>
-                                <label>
-                                    Cuenta numero
-                                    <input name="cuenta_numero" value="{{ old('cuenta_numero', $documentDefaults['cuenta_numero']) }}" @required($isRegistro || $isBdh)>
-                                </label>
-                                <label>
-                                    Codigo de socio
-                                    <input name="codigo_socio" value="{{ old('codigo_socio', $documentDefaults['codigo_socio']) }}" @required($isRegistro)>
-                                </label>
-                                <label>
-                                    Tipo de cuenta
-                                    <input name="tipo_cuenta" value="{{ old('tipo_cuenta', $documentDefaults['tipo_cuenta']) }}" @required($isRegistro)>
-                                </label>
-                                <label>
-                                    Ciudad
-                                    <input name="ciudad" value="{{ old('ciudad', $documentDefaults['ciudad']) }}" @required($isSolicitud)>
-                                </label>
-                                <label>
-                                    Dia
-                                    <input name="dia" value="{{ old('dia', $documentDefaults['dia']) }}" maxlength="2" @required($isSolicitud || $isBdh)>
-                                </label>
-                                <label>
-                                    Mes
-                                    <input name="mes" value="{{ old('mes', $documentDefaults['mes']) }}" @required($isSolicitud || $isBdh)>
-                                </label>
-                                <label>
-                                    Anio
-                                    <input name="anio" value="{{ old('anio', $documentDefaults['anio']) }}" maxlength="4" @required($isSolicitud || $isBdh)>
-                                </label>
-                                @if ($isBdh)
-                                    <label class="span-2">
-                                        Direccion
-                                        <input name="direccion" value="{{ old('direccion', $documentDefaults['direccion']) }}" required>
-                                    </label>
-                                @else
-                                    <input type="hidden" name="direccion" value="{{ $documentDefaults['direccion'] }}">
-                                @endif
-                                @if ($isSolicitud)
-                                    <label>
-                                        Calidad de ingreso
-                                        <select name="tipo_solicitante" required>
-                                            <option value="socio" @selected($documentDefaults['tipo_solicitante'] === 'socio')>Socio</option>
-                                            <option value="cliente" @selected($documentDefaults['tipo_solicitante'] === 'cliente')>Cliente</option>
-                                        </select>
-                                    </label>
-                                    <label>
-                                        Fondo mortuorio
-                                        <select name="fondo_mortuorio" required>
-                                            <option value="no" @selected($documentDefaults['fondo_mortuorio'] === 'no')>No solicita</option>
-                                            <option value="si" @selected($documentDefaults['fondo_mortuorio'] === 'si')>Si solicita</option>
-                                        </select>
-                                    </label>
-                                @else
-                                    <input type="hidden" name="tipo_solicitante" value="{{ $documentDefaults['tipo_solicitante'] }}">
-                                    <input type="hidden" name="fondo_mortuorio" value="{{ $documentDefaults['fondo_mortuorio'] }}">
-                                @endif
-                            </div>
-                            <div class="actions">
-                                <button class="button primary" type="submit">Abrir documento editable</button>
-                                <button class="button ghost" type="button" data-dialog-close>Cancelar</button>
-                            </div>
-                        </form>
-                    </dialog>
-                @endif
             @endforeach
         </div>
         @if ($internalComplete)

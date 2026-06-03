@@ -22,7 +22,7 @@ Route::prefix('aperturas')->name('accounts.')->group(function () {
     Route::post('/{opening}/consentimiento', [AccountOpeningController::class, 'uploadConsent'])->name('consent.upload');
     Route::post('/{opening}/documentos', [AccountOpeningController::class, 'uploadRequirement'])->name('requirements.upload');
     Route::post('/{opening}/consulta-externa', [AccountOpeningController::class, 'uploadExternalEvidence'])->name('external.upload');
-    Route::post('/{opening}/documentos-internos/{template}/generar', [AccountOpeningController::class, 'generateInternalDocument'])->name('internal.generate');
+    Route::get('/{opening}/documentos-internos/{template}/generar', [AccountOpeningController::class, 'generateInternalDocument'])->name('internal.generate');
     Route::post('/{opening}/documentos-internos', [AccountOpeningController::class, 'uploadInternalDocument'])->name('internal.upload');
     Route::post('/{opening}/servicios/documentos', [AccountOpeningController::class, 'uploadServiceDocument'])->name('services.documents.upload');
     Route::post('/{opening}/servicios', [AccountOpeningController::class, 'saveServices'])->name('services.save');
