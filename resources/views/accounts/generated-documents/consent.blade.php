@@ -67,15 +67,19 @@
 
         .sheet-wrap {
             display: flex;
+            flex-direction: column;
+            align-items: center;
             justify-content: center;
+            gap: 22px;
             padding: 28px 18px 56px;
         }
 
         .sheet {
             position: relative;
             width: 210mm;
+            height: 297mm;
             min-height: 297mm;
-            overflow: visible;
+            overflow: hidden;
             background: #fff;
             box-shadow: var(--paper-shadow);
         }
@@ -274,9 +278,16 @@
 
             .sheet {
                 width: 210mm;
+                height: 297mm;
                 min-height: 297mm;
                 box-shadow: none;
+                break-after: page;
                 page-break-after: always;
+            }
+
+            .sheet:last-child {
+                break-after: auto;
+                page-break-after: auto;
             }
         }
     </style>
@@ -321,7 +332,11 @@
                     <li><strong>Conservacion:</strong> Los datos personales deben ser conservados solo durante el tiempo necesario para cumplir con la finalidad para la cual fueron recogidos.</li>
                     <li><strong>Seguridad de datos personales:</strong> Los responsables del tratamiento deben implementar medidas tecnicas y organizativas para garantizar la seguridad de los datos personales y prevenir su acceso no autorizado, perdida o destruccion.</li>
                 </ul>
+            </section>
+        </article>
 
+        <article class="sheet">
+            <section class="content">
                 <div class="section-title">2. Finalidad del Tratamiento de Datos Personales</div>
                 <p>Los datos personales que usted proporcione seran tratados para las siguientes finalidades:</p>
                 <p><strong>Finalidades necesarias (no requieren consentimiento):</strong></p>
@@ -362,7 +377,11 @@
                     <li><strong>Revocacion del consentimiento:</strong> Revocar su consentimiento en cualquier momento, sin que esto afecte la legalidad del tratamiento realizado antes de la revocacion.</li>
                     <li><strong>No ser objeto de decisiones automatizadas:</strong> No ser sometido a decisiones basadas unicamente en valoraciones automatizadas.</li>
                 </ul>
+            </section>
+        </article>
 
+        <article class="sheet">
+            <section class="content">
                 <div class="section-title">6. Procedimiento para Ejercer sus Derechos</div>
                 <p>Para ejercer sus derechos, puede presentar una solicitud por escrito o por correo electronico dirigido al Responsable del Tratamiento de Datos Personales y al Delegado de Proteccion de Datos (DPO), indicando claramente el derecho que desea ejercer. La solicitud debe incluir:</p>
                 <ul class="list">
@@ -391,7 +410,11 @@
                     <li>Control de acceso restringido a personal autorizado.</li>
                     <li>Auditorias periodicas de los sistemas de informacion.</li>
                 </ul>
+            </section>
+        </article>
 
+        <article class="sheet">
+            <section class="content">
                 <div class="section-title">10. Consentimiento</div>
                 <p>El tratamiento de sus datos personales necesario para la gestion de la relacion contractual, evaluacion crediticia y cumplimiento de obligaciones legales no requiere su consentimiento, conforme a la normativa aplicable.</p>
                 <p>Usted podra otorgar o negar su consentimiento para las siguientes finalidades opcionales:</p>
