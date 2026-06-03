@@ -97,7 +97,7 @@
             z-index: 1;
             min-height: 297mm;
             height: 297mm;
-            padding: 33mm 16mm 39mm;
+            padding: 33mm 16mm 42mm;
             font-size: 7.15pt;
             line-height: 1.16;
         }
@@ -349,11 +349,7 @@
                     <li>Uso de imagen para fines publicitarios.</li>
                 </ul>
                 <p>El titular podra aceptar o rechazar las finalidades opcionales, sin que ello afecte la prestacion de los servicios principales ofrecidos por la Cooperativa.</p>
-            </section>
-        </article>
 
-        <article class="sheet">
-            <section class="content">
                 <div class="section-title">3. Tipos de Datos Personales Recolectados</div>
                 <ul class="list">
                     <li><strong>Datos personales:</strong> Nombres, Apellidos, cedula de identidad, codigo dactilar, fecha de nacimiento, edad, lugar de nacimiento, estado civil, etc.</li>
@@ -362,7 +358,11 @@
                     <li><strong>Datos financieros:</strong> Cuentas bancarias, saldo en las cuentas, ingresos y egresos, salario, etc.</li>
                     <li><strong>Datos sensibles:</strong> Solo se recolectaran y trataran datos personales sensibles, tales como estado de salud, identidad de genero, etnia, pasado judicial, cargas familiares u otros de naturaleza similar, con su consentimiento explicito y unicamente cuando resulte estrictamente necesario para el cumplimiento de finalidades legitimas, aplicando medidas reforzadas de seguridad y confidencialidad conforme a la normativa vigente.</li>
                 </ul>
+            </section>
+        </article>
 
+        <article class="sheet">
+            <section class="content">
                 <div class="section-title">4. Base Legal del Tratamiento</div>
                 <p>El tratamiento de sus datos personales se realiza conforme a lo establecido en la Ley Organica de Proteccion de Datos Personales (LOPDP) y su Reglamento General. La base legal para el tratamiento incluye:</p>
                 <p>a) Su consentimiento explicito para el tratamiento de sus datos personales. b) El cumplimiento de obligaciones legales y contractuales. c) El interes legitimo de la Cooperativa, siempre que no prevalezcan sus derechos fundamentales.</p>
@@ -390,11 +390,7 @@
 
                 <div class="section-title">7. Transferencia de Datos Personales</div>
                 <p>Sus datos personales podran ser transferidos a terceros unicamente en los casos permitidos por la Ley y para las finalidades descritas en este documento. En caso de transferencias internacionales, se garantizara que los destinatarios cumplan con los estandares de proteccion de datos establecidos en la LOPDP.</p>
-            </section>
-        </article>
 
-        <article class="sheet">
-            <section class="content">
                 <div class="section-title">8. Plazo de Conservacion de los Datos</div>
                 <p>Sus datos personales seran conservados durante el tiempo necesario para cumplir con las finalidades descritas en el presente documento, asi como para atender obligaciones legales, regulatorias y contractuales aplicables.</p>
                 <ul class="list">
@@ -421,7 +417,11 @@
                     <div class="check-row"><span class="box editable" contenteditable="true"></span><span>Uso de imagen para fines publicitarios.</span></div>
                 </div>
                 <p>En caso de tratamiento de datos personales sensibles, se solicitara su consentimiento explicito de manera independiente cuando corresponda. La negativa a otorgar el consentimiento para finalidades no necesarias no afectara la prestacion de los servicios principales ofrecidos por la Cooperativa.</p>
+            </section>
+        </article>
 
+        <article class="sheet">
+            <section class="content">
                 <div class="section-title">11. Revocacion del Consentimiento</div>
                 <p>Usted puede revocar su consentimiento en cualquier momento, presentando una solicitud por escrito al Responsable del Tratamiento de Datos Personales y al Delegado de Proteccion de Datos (DPO). La revocacion no tendra efectos retroactivos.</p>
 
