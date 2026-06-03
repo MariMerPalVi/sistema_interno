@@ -85,6 +85,7 @@ class AccountOpeningController extends Controller
             'serviceTemplates' => $this->serviceDocumentTemplates()->get(),
             'services' => AdditionalService::where('active', true)->orderBy('name')->get(),
             'serviceDocumentMap' => $this->serviceDocumentMap(),
+            'consentDefaults' => $this->consentDocumentDefaults($opening),
             'documentDefaults' => $this->documentDownloadDefaults($opening),
             'progress' => $this->calculateProgress($opening),
             'workflow' => $workflow,
@@ -108,13 +109,24 @@ class AccountOpeningController extends Controller
         return back()->with('success', 'Datos del socio guardados.');
     }
 
-    public function editConsentDocument(AccountOpening $opening)
+    public function editConsentDocument(Request $request, AccountOpening $opening)
     {
-        $opening->load(['accountType', 'documents']);
+        $opening->load(['accountType']);
 
         return view('accounts.generated-documents.consent', [
             'opening' => $opening,
-            'fields' => $this->documentDownloadDefaults($opening),
+            'fields' => array_merge(
+                $this->consentDocumentDefaults($opening),
+                $request->only([
+                    'apellidos_nombres',
+                    'cedula_identidad',
+                    'ciudad',
+                    'dia',
+                    'mes',
+                    'anio',
+                    'tipo_cuenta',
+                ])
+            ),
         ]);
     }
 
@@ -679,6 +691,23 @@ class AccountOpeningController extends Controller
             'anio' => now()->format('Y'),
             'tipo_solicitante' => 'socio',
             'fondo_mortuorio' => 'no',
+        ];
+    }
+
+    private function consentDocumentDefaults(AccountOpening $opening): array
+    {
+        $opening->loadMissing('accountType');
+        $fullName = $this->singleLine(trim(($opening->member_first_names ?? '').' '.($opening->member_last_names ?? '')));
+        $identification = preg_replace('/\D+/', '', (string) $opening->member_identification);
+
+        return [
+            'apellidos_nombres' => $fullName,
+            'cedula_identidad' => strlen($identification) === 10 ? $identification : '',
+            'ciudad' => 'Las Naves',
+            'dia' => now()->format('d'),
+            'mes' => now()->locale('es')->translatedFormat('F'),
+            'anio' => now()->format('Y'),
+            'tipo_cuenta' => $opening->accountType->name,
         ];
     }
 
