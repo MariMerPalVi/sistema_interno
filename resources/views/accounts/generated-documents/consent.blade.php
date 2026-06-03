@@ -97,15 +97,15 @@
             z-index: 1;
             min-height: 297mm;
             height: 297mm;
-            padding: 34mm 18mm 42mm;
-            font-size: 8pt;
-            line-height: 1.26;
+            padding: 33mm 16mm 39mm;
+            font-size: 7.15pt;
+            line-height: 1.16;
         }
 
         h1 {
-            margin: 0 0 8mm;
+            margin: 0 0 5mm;
             text-align: center;
-            font-size: 13.5pt;
+            font-size: 12pt;
             line-height: 1.2;
             font-weight: 800;
             text-transform: uppercase;
@@ -113,16 +113,16 @@
         }
 
         p {
-            margin: 0 0 2.3mm;
+            margin: 0 0 1.6mm;
             text-align: justify;
         }
 
         .info-block {
-            margin-bottom: 3mm;
+            margin-bottom: 2mm;
         }
 
         .info-block p {
-            margin-bottom: .9mm;
+            margin-bottom: .55mm;
         }
 
         .date-row .editable {
@@ -164,18 +164,18 @@
         }
 
         .section-title {
-            margin: 3.2mm 0 1.2mm;
+            margin: 2.2mm 0 .8mm;
             font-weight: 800;
-            font-size: 9.2pt;
+            font-size: 7.8pt;
         }
 
         .list {
-            margin: 0 0 1.8mm;
-            padding-left: 5.5mm;
+            margin: 0 0 1.1mm;
+            padding-left: 4.3mm;
         }
 
         .list li {
-            margin-bottom: .7mm;
+            margin-bottom: .28mm;
             text-align: justify;
         }
 
@@ -183,18 +183,18 @@
             display: flex;
             gap: 3mm;
             align-items: flex-start;
-            margin: 2.4mm 0;
+            margin: 1.4mm 0;
         }
 
         .box {
-            width: 5mm;
-            height: 5mm;
-            flex: 0 0 5mm;
+            width: 4mm;
+            height: 4mm;
+            flex: 0 0 4mm;
             border: 1.5px solid var(--line);
             text-align: center;
-            font-size: 8pt;
+            font-size: 7pt;
             font-weight: 800;
-            line-height: 4.4mm;
+            line-height: 3.5mm;
         }
 
         .signature {
@@ -207,22 +207,22 @@
         .two-columns {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 7mm;
-            margin-top: 3mm;
+            gap: 6mm;
+            margin-top: 1.5mm;
         }
 
         .data-lines {
             display: grid;
-            gap: 2mm;
+            gap: .8mm;
         }
 
         .data-line {
-            min-height: 6.8mm;
+            min-height: 4.7mm;
         }
 
         .line {
             display: block;
-            min-height: 4.6mm;
+            min-height: 3mm;
             border-bottom: 1px dashed #4d5967;
             font-weight: 700;
             outline: none;
@@ -235,14 +235,14 @@
         .line-label {
             display: block;
             margin-top: .4mm;
-            font-size: 7pt;
+            font-size: 5.9pt;
             color: var(--muted);
         }
 
         .consent-checks {
             display: grid;
-            gap: 1.2mm;
-            margin: 2mm 0 2.4mm;
+            gap: .8mm;
+            margin: 1.2mm 0 1.6mm;
         }
 
         .signature::before {
@@ -430,11 +430,7 @@
 
                 <div class="section-title">13. Reclamaciones ante la Autoridad de Control</div>
                 <p>Si considera que sus derechos han sido vulnerados, tiene derecho a presentar una reclamacion ante la Autoridad de Proteccion de Datos Personales del Ecuador.</p>
-            </section>
-        </article>
 
-        <article class="sheet">
-            <section class="content">
                 <div class="section-title">Datos del titular y declaracion de consentimiento</div>
                 <p>El titular declara que ha leido, comprendido y aceptado el contenido del presente documento, y que ha otorgado su consentimiento de manera libre, especifica, informada e inequivoca conforme a las finalidades seleccionadas.</p>
 
