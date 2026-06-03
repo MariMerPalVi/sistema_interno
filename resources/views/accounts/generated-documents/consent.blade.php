@@ -97,9 +97,9 @@
             z-index: 1;
             min-height: 297mm;
             height: 297mm;
-            padding: 34mm 18mm 50mm;
-            font-size: 8.2pt;
-            line-height: 1.3;
+            padding: 34mm 18mm 42mm;
+            font-size: 8pt;
+            line-height: 1.26;
         }
 
         h1 {
@@ -113,16 +113,16 @@
         }
 
         p {
-            margin: 0 0 3mm;
+            margin: 0 0 2.3mm;
             text-align: justify;
         }
 
         .info-block {
-            margin-bottom: 4mm;
+            margin-bottom: 3mm;
         }
 
         .info-block p {
-            margin-bottom: 1.2mm;
+            margin-bottom: .9mm;
         }
 
         .date-row .editable {
@@ -164,18 +164,18 @@
         }
 
         .section-title {
-            margin: 4mm 0 1.6mm;
+            margin: 3.2mm 0 1.2mm;
             font-weight: 800;
             font-size: 9.2pt;
         }
 
         .list {
-            margin: 0 0 2.4mm;
+            margin: 0 0 1.8mm;
             padding-left: 5.5mm;
         }
 
         .list li {
-            margin-bottom: .9mm;
+            margin-bottom: .7mm;
             text-align: justify;
         }
 
@@ -183,7 +183,7 @@
             display: flex;
             gap: 3mm;
             align-items: flex-start;
-            margin: 4mm 0;
+            margin: 2.4mm 0;
         }
 
         .box {
@@ -207,22 +207,22 @@
         .two-columns {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8mm;
-            margin-top: 5mm;
+            gap: 7mm;
+            margin-top: 3mm;
         }
 
         .data-lines {
             display: grid;
-            gap: 4mm;
+            gap: 2mm;
         }
 
         .data-line {
-            min-height: 9mm;
+            min-height: 6.8mm;
         }
 
         .line {
             display: block;
-            min-height: 6mm;
+            min-height: 4.6mm;
             border-bottom: 1px dashed #4d5967;
             font-weight: 700;
             outline: none;
@@ -234,15 +234,15 @@
 
         .line-label {
             display: block;
-            margin-top: 1mm;
-            font-size: 7.4pt;
+            margin-top: .4mm;
+            font-size: 7pt;
             color: var(--muted);
         }
 
         .consent-checks {
             display: grid;
-            gap: 2mm;
-            margin: 3mm 0 4mm;
+            gap: 1.2mm;
+            margin: 2mm 0 2.4mm;
         }
 
         .signature::before {
@@ -367,11 +367,7 @@
                 <p>El tratamiento de sus datos personales se realiza conforme a lo establecido en la Ley Organica de Proteccion de Datos Personales (LOPDP) y su Reglamento General. La base legal para el tratamiento incluye:</p>
                 <p>a) Su consentimiento explicito para el tratamiento de sus datos personales. b) El cumplimiento de obligaciones legales y contractuales. c) El interes legitimo de la Cooperativa, siempre que no prevalezcan sus derechos fundamentales.</p>
                 <p>El consentimiento sera requerido unicamente cuando el tratamiento no pueda sustentarse en otra base de legitimacion prevista en la normativa aplicable.</p>
-            </section>
-        </article>
 
-        <article class="sheet">
-            <section class="content">
                 <div class="section-title">5. Derechos del Titular de los Datos Personales</div>
                 <ul class="list">
                     <li><strong>Acceso:</strong> Conocer que datos personales estan siendo tratados y como.</li>
