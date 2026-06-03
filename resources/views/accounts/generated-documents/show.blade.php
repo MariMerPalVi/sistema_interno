@@ -96,7 +96,7 @@
         .template-content {
             position: relative;
             z-index: 1;
-            padding: 19mm 12mm 16mm;
+            padding: 26mm 17mm 16mm;
         }
 
         .application-document {
@@ -106,7 +106,7 @@
         }
 
         .application-document h1 {
-            margin: 0 0 17mm;
+            margin: 4mm 0 18mm;
             font-size: 18px;
             font-weight: 800;
             text-align: center;
@@ -168,7 +168,7 @@
 
         .approval-box {
             margin-top: 7mm;
-            padding: 5mm 5mm 4mm;
+            padding: 5mm 6mm 4mm;
             border: 1.4px solid #111;
             font-size: 9px;
             line-height: 1.35;
