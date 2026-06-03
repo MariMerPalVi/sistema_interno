@@ -96,9 +96,10 @@
             position: relative;
             z-index: 1;
             min-height: 297mm;
-            padding: 34mm 18mm 28mm;
-            font-size: 8.6pt;
-            line-height: 1.36;
+            height: 297mm;
+            padding: 34mm 18mm 50mm;
+            font-size: 8.2pt;
+            line-height: 1.3;
         }
 
         h1 {
@@ -163,18 +164,18 @@
         }
 
         .section-title {
-            margin: 5mm 0 2mm;
+            margin: 4mm 0 1.6mm;
             font-weight: 800;
             font-size: 9.2pt;
         }
 
         .list {
-            margin: 0 0 3mm;
+            margin: 0 0 2.4mm;
             padding-left: 5.5mm;
         }
 
         .list li {
-            margin-bottom: 1.2mm;
+            margin-bottom: .9mm;
             text-align: justify;
         }
 
@@ -366,7 +367,11 @@
                 <p>El tratamiento de sus datos personales se realiza conforme a lo establecido en la Ley Organica de Proteccion de Datos Personales (LOPDP) y su Reglamento General. La base legal para el tratamiento incluye:</p>
                 <p>a) Su consentimiento explicito para el tratamiento de sus datos personales. b) El cumplimiento de obligaciones legales y contractuales. c) El interes legitimo de la Cooperativa, siempre que no prevalezcan sus derechos fundamentales.</p>
                 <p>El consentimiento sera requerido unicamente cuando el tratamiento no pueda sustentarse en otra base de legitimacion prevista en la normativa aplicable.</p>
+            </section>
+        </article>
 
+        <article class="sheet">
+            <section class="content">
                 <div class="section-title">5. Derechos del Titular de los Datos Personales</div>
                 <ul class="list">
                     <li><strong>Acceso:</strong> Conocer que datos personales estan siendo tratados y como.</li>
@@ -433,7 +438,11 @@
 
                 <div class="section-title">13. Reclamaciones ante la Autoridad de Control</div>
                 <p>Si considera que sus derechos han sido vulnerados, tiene derecho a presentar una reclamacion ante la Autoridad de Proteccion de Datos Personales del Ecuador.</p>
+            </section>
+        </article>
 
+        <article class="sheet">
+            <section class="content">
                 <div class="section-title">Datos del titular y declaracion de consentimiento</div>
                 <p>El titular declara que ha leido, comprendido y aceptado el contenido del presente documento, y que ha otorgado su consentimiento de manera libre, especifica, informada e inequivoca conforme a las finalidades seleccionadas.</p>
 
