@@ -98,12 +98,12 @@
             min-height: 297mm;
             height: 297mm;
             padding: 33mm 16mm 42mm;
-            font-size: 7.15pt;
-            line-height: 1.16;
+            font-size: 7.65pt;
+            line-height: 1.24;
         }
 
         h1 {
-            margin: 0 0 5mm;
+            margin: 0 0 6mm;
             text-align: center;
             font-size: 12pt;
             line-height: 1.2;
@@ -113,16 +113,16 @@
         }
 
         p {
-            margin: 0 0 1.6mm;
+            margin: 0 0 2mm;
             text-align: justify;
         }
 
         .info-block {
-            margin-bottom: 2mm;
+            margin-bottom: 2.5mm;
         }
 
         .info-block p {
-            margin-bottom: .55mm;
+            margin-bottom: .8mm;
         }
 
         .date-row .editable {
@@ -164,18 +164,18 @@
         }
 
         .section-title {
-            margin: 2.2mm 0 .8mm;
+            margin: 3mm 0 1.2mm;
             font-weight: 800;
-            font-size: 7.8pt;
+            font-size: 8.35pt;
         }
 
         .list {
-            margin: 0 0 1.1mm;
-            padding-left: 4.3mm;
+            margin: 0 0 1.6mm;
+            padding-left: 4.8mm;
         }
 
         .list li {
-            margin-bottom: .28mm;
+            margin-bottom: .55mm;
             text-align: justify;
         }
 
@@ -183,7 +183,7 @@
             display: flex;
             gap: 3mm;
             align-items: flex-start;
-            margin: 1.4mm 0;
+            margin: 2mm 0;
         }
 
         .box {
@@ -207,22 +207,22 @@
         .two-columns {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 6mm;
-            margin-top: 1.5mm;
+            gap: 7mm;
+            margin-top: 2.2mm;
         }
 
         .data-lines {
             display: grid;
-            gap: .8mm;
+            gap: 1.2mm;
         }
 
         .data-line {
-            min-height: 4.7mm;
+            min-height: 5.4mm;
         }
 
         .line {
             display: block;
-            min-height: 3mm;
+            min-height: 3.8mm;
             border-bottom: 1px dashed #4d5967;
             font-weight: 700;
             outline: none;
@@ -235,14 +235,14 @@
         .line-label {
             display: block;
             margin-top: .4mm;
-            font-size: 5.9pt;
+            font-size: 6.5pt;
             color: var(--muted);
         }
 
         .consent-checks {
             display: grid;
-            gap: .8mm;
-            margin: 1.2mm 0 1.6mm;
+            gap: 1.2mm;
+            margin: 1.8mm 0 2.2mm;
         }
 
         .signature::before {
