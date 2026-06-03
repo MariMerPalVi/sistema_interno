@@ -93,7 +93,101 @@
         .template-content {
             position: relative;
             z-index: 1;
-            padding: 39mm 20mm 18mm;
+            padding: 19mm 12mm 16mm;
+        }
+
+        .application-document {
+            width: 100%;
+            color: #111;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .application-document h1 {
+            margin: 0 0 17mm;
+            font-size: 18px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .application-document p {
+            margin: 0 0 3.8mm;
+            font-size: 11px;
+            line-height: 1.32;
+        }
+
+        .application-document .letter-date {
+            margin-left: 58mm;
+            margin-bottom: 14mm;
+            white-space: nowrap;
+        }
+
+        .application-document .editable {
+            min-width: 32mm;
+            padding: 0 .8mm;
+            border-bottom: 1px solid #111;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .application-document .editable.short {
+            min-width: 8mm;
+        }
+
+        .application-document .editable.medium {
+            min-width: 22mm;
+        }
+
+        .application-document .editable.long {
+            min-width: 116mm;
+        }
+
+        .application-document .check {
+            width: auto;
+            height: auto;
+            min-width: 4mm;
+            border: 0;
+            margin: 0;
+            line-height: inherit;
+        }
+
+        .application-document .signature {
+            margin: 15mm 0 8mm;
+            text-align: center;
+        }
+
+        .application-document .signature span {
+            min-width: 54mm;
+            border-top: 1px solid #111;
+            padding-top: 2mm;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .approval-box {
+            margin-top: 7mm;
+            padding: 5mm 5mm 4mm;
+            border: 1.4px solid #111;
+            font-size: 9px;
+            line-height: 1.35;
+        }
+
+        .approval-box p {
+            margin-bottom: 8mm;
+            font-size: 9px;
+            line-height: 1.35;
+            text-align: justify;
+        }
+
+        .manager-signature {
+            text-align: center;
+            font-size: 9px;
+        }
+
+        .manager-signature span {
+            display: inline-block;
+            min-width: 64mm;
+            border-top: 1px solid #111;
+            padding-top: 2mm;
         }
 
         .pdf-field {
@@ -368,7 +462,7 @@
             </table>
         @elseif ($isApplication)
             <img class="template-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
-            <section class="template-content" aria-label="Solicitud de ingreso editable">
+            <section class="template-content application-document" aria-label="Solicitud de ingreso editable">
                 <h1>SOLICITUD DE INGRESO</h1>
                 <p class="letter-date">
                     <span class="editable medium" contenteditable="true">{{ $city }}</span>,
@@ -391,17 +485,17 @@
 
                 <p>
                     Se sirvan aceptar la presente solicitud de ingreso en calidad de
-                    SOCIO <span class="check" contenteditable="true">{{ $requestType === 'socio' ? 'X' : '' }}</span>
-                    CLIENTE <span class="check" contenteditable="true">{{ $requestType === 'cliente' ? 'X' : '' }}</span>
+                    SOCIO ( <span class="check" contenteditable="true">{{ $requestType === 'socio' ? 'X' : '' }}</span> )
+                    CLIENTE ( <span class="check" contenteditable="true">{{ $requestType === 'cliente' ? 'X' : '' }}</span> )
                     a la COAC LAS NAVES, comprometiéndome a cumplir la Ley Orgánica Economía Popular Solidaria, el Sector Financiero, el Reglamento de la Presente Ley, los estatutos y demás reglamentos internos de la misma.
                 </p>
 
                 <p>
-                    <span class="check" contenteditable="true">{{ $mortuaryFund === 'si' ? 'X' : '' }}</span>
+                    ( <span class="check" contenteditable="true">{{ $mortuaryFund === 'si' ? 'X' : '' }}</span> )
                     Solicito ser beneficiario del fondo mortuorio y acogerme a las políticas establecidas por la Institución.
                 </p>
                 <p>
-                    <span class="check" contenteditable="true">{{ $mortuaryFund === 'no' ? 'X' : '' }}</span>
+                    ( <span class="check" contenteditable="true">{{ $mortuaryFund === 'no' ? 'X' : '' }}</span> )
                     Solicito no ser beneficiario del fondo mortuorio.
                 </p>
 
@@ -410,6 +504,15 @@
                 <div class="signature">
                     <span>SOLICITANTE</span>
                 </div>
+
+                <section class="approval-box">
+                    <p>
+                        La presente SOLICITUD DE INGRESO es aprobada por el Gerente, de acuerdo con lo establecido en el Estatuto Social, Artículo 21, numeral 6 “Aceptar o rechazar las solicitudes de ingreso o retiro de socios, la atribución de aceptar socios podrá ser delegada a la gerencia o administradores de las oficinas operativas, en los segmentos que la reglamentación lo permita” y mediante <strong>Resolución N° 2015-22-05</strong> emitida por el Consejo de Administración el 15 de junio del 2015.
+                    </p>
+                    <div class="manager-signature">
+                        <span>APROBADO POR GERENTE</span>
+                    </div>
+                </section>
             </section>
         @else
             <h1>{{ strtoupper($template->name) }}</h1>
