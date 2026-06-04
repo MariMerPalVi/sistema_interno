@@ -335,6 +335,15 @@ class AccountOpeningController extends Controller
                 ->withErrors('Este documento no tiene formato descargable configurado.');
         }
 
+        if ($this->isBdhTemplate($template)) {
+            $this->audit($opening, 'abrir_formato_bdh', "Formato original abierto: {$template->name}.");
+
+            return response()->file(public_path($template->template_path), [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.basename($template->template_path).'"',
+            ]);
+        }
+
         $data = array_merge(
             $this->documentDownloadDefaults($opening),
             $request->only([
@@ -692,6 +701,18 @@ class AccountOpeningController extends Controller
             'tipo_solicitante' => 'socio',
             'fondo_mortuorio' => 'no',
         ];
+    }
+
+    private function isBdhTemplate(InternalDocumentTemplate $template): bool
+    {
+        $slug = strtolower($template->slug);
+        $path = strtolower((string) $template->template_path);
+
+        return str_contains($path, 'bdh.pdf')
+            || str_contains($slug, 'bdh')
+            || str_contains($slug, 'acreditacion')
+            || str_contains($slug, 'reapertura')
+            || str_contains($slug, 'cierre');
     }
 
     private function consentDocumentDefaults(AccountOpening $opening): array
