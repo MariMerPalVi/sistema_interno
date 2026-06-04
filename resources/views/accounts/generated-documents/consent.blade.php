@@ -82,6 +82,8 @@
             overflow: hidden;
             background: #fff;
             box-shadow: var(--paper-shadow);
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
         }
 
         .sheet::before {
@@ -90,6 +92,20 @@
             inset: 0;
             background: url("{{ asset('formatos/Fondo_page-0001.jpg') }}") center top / 100% 100% no-repeat;
             pointer-events: none;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+
+        .sheet-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
         }
 
         .content {
@@ -302,6 +318,7 @@
 
     <main class="sheet-wrap">
         <article class="sheet">
+            <img class="sheet-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
             <section class="content">
                 <h1>Consentimiento para el tratamiento de datos personales</h1>
 
@@ -362,6 +379,7 @@
         </article>
 
         <article class="sheet">
+            <img class="sheet-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
             <section class="content">
                 <div class="section-title">4. Base Legal del Tratamiento</div>
                 <p>El tratamiento de sus datos personales se realiza conforme a lo establecido en la Ley Organica de Proteccion de Datos Personales (LOPDP) y su Reglamento General. La base legal para el tratamiento incluye:</p>
@@ -411,6 +429,7 @@
         </article>
 
         <article class="sheet">
+            <img class="sheet-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
             <section class="content">
                 <div class="section-title">10. Consentimiento</div>
                 <p>El tratamiento de sus datos personales necesario para la gestion de la relacion contractual, evaluacion crediticia y cumplimiento de obligaciones legales no requiere su consentimiento, conforme a la normativa aplicable.</p>

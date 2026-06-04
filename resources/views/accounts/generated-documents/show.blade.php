@@ -220,6 +220,88 @@
             outline: none;
         }
 
+        .bdh-document {
+            margin-top: 4mm;
+            font-size: 11px;
+            line-height: 1.42;
+            text-align: center;
+        }
+
+        .bdh-account {
+            margin: -2mm 0 2mm;
+            text-align: right;
+            font-weight: 800;
+        }
+
+        .bdh-title {
+            margin: 0 0 3mm;
+            padding: 1.8mm 2mm;
+            background: #0879bd;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 900;
+            text-align: center;
+        }
+
+        .bdh-document p {
+            margin: 0 0 2.4mm;
+            font-size: 11px;
+            line-height: 1.45;
+            text-align: justify;
+        }
+
+        .bdh-document .editable {
+            min-width: 34mm;
+            padding: 0 1mm;
+            border-bottom: 1px solid #111;
+            font-weight: 800;
+            line-height: 1.15;
+        }
+
+        .bdh-document .editable.long {
+            min-width: 92mm;
+        }
+
+        .bdh-document .editable.short {
+            min-width: 18mm;
+        }
+
+        .bdh-account .editable {
+            min-width: 30mm;
+            text-align: center;
+        }
+
+        .bdh-center {
+            text-align: center;
+        }
+
+        .bdh-stamp {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 34mm;
+            height: 34mm;
+            margin: 4mm auto 5mm;
+            border: 1.5mm solid #1d5fc7;
+            border-radius: 50%;
+            color: #1d5fc7;
+            font-size: 9px;
+            font-weight: 900;
+            line-height: 1.05;
+            text-align: center;
+            transform: rotate(-8deg);
+        }
+
+        .bdh-signature {
+            width: 88mm;
+            margin: 12mm 0 4mm 10mm;
+            border-top: 1px dashed #111;
+            padding-top: 2mm;
+            text-align: left;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
         .brand-row {
             display: flex;
             align-items: flex-start;
@@ -516,6 +598,46 @@
                         <span>APROBADO POR GERENTE</span>
                     </div>
                 </section>
+            </section>
+        @elseif ($isBdh)
+            <section class="bdh-document" aria-label="Autorizacion BDH editable">
+                <p class="bdh-account">
+                    CUENTA N°:
+                    <span class="editable short" contenteditable="true">{{ $accountNumber }}</span>
+                </p>
+
+                <div class="bdh-title">SOLICITUD DE AUTORIZACIÓN PARA ACCEDER AL PAGO DE LA TRANSFERENCIA MONETARIA MEDIANTE DEPÓSITO EN CUENTA</div>
+
+                <p>
+                    <strong>Yo,</strong>
+                    <span class="editable long" contenteditable="true">{{ $fullName }}</span>,
+                    portador(a) de la cédula de identidad N°
+                    <span class="editable" contenteditable="true">{{ $identification }}</span>
+                </p>
+                <p>
+                    en calidad de usuario de las Transferencias Monetarias MIES otorgado por el Gobierno Nacional, en forma expresa autorizo a la
+                </p>
+                <p class="bdh-center">
+                    COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES LTDA., a que se acredite mensualmente el monto del beneficio que me
+                </p>
+                <p class="bdh-center">
+                    corresponde; a mi cuenta de ahorros que mantengo en dicha institución:
+                </p>
+                <p class="bdh-center">
+                    <strong>Número de Cuenta:</strong>
+                    <span class="editable short" contenteditable="true">{{ $accountNumber }}</span>
+                </p>
+                <p>
+                    Para constancia suscribo el presente documento y/o (imprimo la huella digital de mi pulgar derecho).
+                </p>
+                <p>
+                    <strong>Lugar y Fecha : Las Naves,</strong>
+                    <span class="editable" contenteditable="true">{{ $day }} de {{ $month }} del {{ $year }}</span>
+                </p>
+
+                <div class="bdh-stamp">LAS NAVES<br>COOPERATIVA DE<br>AHORRO Y CRÉDITO</div>
+
+                <div class="bdh-signature">Cédula: <span contenteditable="true">{{ $identification }}</span></div>
             </section>
         @else
             <h1>{{ strtoupper($template->name) }}</h1>

@@ -238,11 +238,18 @@
                 <article class="check-item">
                     <div>
                         <h3>{{ $template->name }}</h3>
-                        <span class="status">{{ $template->source === 'econx' ? 'ECONX' : 'MANUAL' }}</span>
-                        @if ($template->template_path)
-                            <a href="{{ route('accounts.internal.generate', [$opening, $template]) }}" target="_blank">Abrir documento editable</a>
+                        <span class="status">{{ $template->source === 'manual' ? 'MANUAL / EDITABLE' : 'ECONX' }}</span>
+                        @if ($template->source === 'manual' && $template->template_path)
+                            <div class="doc-actions">
+                                <a href="{{ route('accounts.internal.generate', [$opening, $template]) }}" target="_blank">Abrir documento editable</a>
+                                <a href="{{ route('accounts.internal.original', [$opening, $template]) }}" target="_blank">Ver documento original</a>
+                            </div>
+                        @elseif ($template->source === 'manual')
+                            <span class="hint">Formato manual editable pendiente de adjuntar</span>
+                        @elseif ($template->template_path)
+                            <a href="{{ route('accounts.internal.original', [$opening, $template]) }}" target="_blank">Ver documento original</a>
                         @else
-                            <span class="hint">Formato pendiente de adjuntar</span>
+                            <span class="hint">Documento obtenido del ECONX</span>
                         @endif
                         @if ($template->file_name_pattern)
                             <p class="hint">Se guardara como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>

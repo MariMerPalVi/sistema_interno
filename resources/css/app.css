@@ -813,3 +813,14 @@ pre {
     min-height: auto;
   }
 }
+
+.doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.doc-actions a {
+  font-weight: 800;
+}

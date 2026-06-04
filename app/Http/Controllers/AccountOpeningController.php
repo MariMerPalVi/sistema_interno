@@ -17,7 +17,6 @@ use App\Models\SelectedAdditionalService;
 use App\Models\UploadedDocument;
 use App\Services\AutomatedReviewService;
 use App\Services\DocumentExtractionService;
-use App\Services\InternalDocumentPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -324,7 +323,7 @@ class AccountOpeningController extends Controller
             ->with('success', 'Evidencia externa guardada.');
     }
 
-    public function generateInternalDocument(Request $request, AccountOpening $opening, InternalDocumentTemplate $template, InternalDocumentPdfService $pdfService)
+    public function generateInternalDocument(Request $request, AccountOpening $opening, InternalDocumentTemplate $template)
     {
         $template = $this->internalTemplatesForOpening($opening)
             ->where('id', $template->id)
@@ -334,15 +333,6 @@ class AccountOpeningController extends Controller
             return redirect()
                 ->route('accounts.show', [$opening, 'paso' => 'internos'])
                 ->withErrors('Este documento no tiene formato descargable configurado.');
-        }
-
-        if ($this->isBdhTemplate($template)) {
-            $this->audit($opening, 'abrir_formato_bdh', "Formato original abierto: {$template->name}.");
-
-            return response()->file(public_path($template->template_path), [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="'.basename($template->template_path).'"',
-            ]);
         }
 
         $data = array_merge(
@@ -372,18 +362,31 @@ class AccountOpeningController extends Controller
 
         $this->audit($opening, 'generar_documento_interno', "Documento generado para descarga: {$template->name}.");
 
-        if ($this->isSignatureRegisterTemplate($template)) {
-            return response($pdfService->generate($opening, $template, $data), 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="'.$downloadName.'"',
-            ]);
-        }
-
         return view('accounts.generated-documents.show', [
             'opening' => $opening,
             'template' => $template,
             'fields' => $data,
             'downloadName' => $downloadName,
+        ]);
+    }
+
+    public function showInternalOriginal(AccountOpening $opening, InternalDocumentTemplate $template)
+    {
+        $template = $this->internalTemplatesForOpening($opening)
+            ->where('id', $template->id)
+            ->firstOrFail();
+
+        if (!$template->template_path || !is_file(public_path($template->template_path))) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'internos'])
+                ->withErrors('Este documento no tiene formato original configurado.');
+        }
+
+        $this->audit($opening, 'abrir_formato_original', "Formato original abierto: {$template->name}.");
+
+        return response()->file(public_path($template->template_path), [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.basename($template->template_path).'"',
         ]);
     }
 
