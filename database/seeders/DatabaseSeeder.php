@@ -221,7 +221,16 @@ class DatabaseSeeder extends Seeder
         $isLegal = $accountType->slug === 'cuenta-juridica';
         $solicitudPath = 'formatos/1-solicitud-de-ingreso.pdf';
 
-        if ($isLegal) {
+        if ($accountType->slug === 'cuenta-basica') {
+            $items = [
+                ['Formulario solicitud apertura de cuenta', null, 'Formulario solicitud apertura cuenta_{expediente}', true, 'sistema'],
+                ['Formulario conozca a su cliente / socio', null, 'Formulario conozca cliente socio_{expediente}', true, 'sistema'],
+                ['Solicitud de ingreso al consejo de administracion', $solicitudPath, 'Solicitud ingreso consejo administracion_{expediente}', true, 'manual'],
+                ['Contrato de apertura de cuenta de ahorros', null, 'Contrato apertura cuenta ahorros_{expediente}', true, 'sistema'],
+                ['Formulario autocertificacion residencia fiscal', null, 'Formulario autocertificacion residencia fiscal_{expediente}', true, 'sistema'],
+                ['Registro de firmas', 'formatos/REGISTRO_DE_FIRMAS.pdf', '7. Registro de firmas_{expediente}', true, 'manual'],
+            ];
+        } elseif ($isLegal) {
             $items = [
                 ['Solicitud de ingreso al consejo de administracion', $solicitudPath, 'Solicitud ingreso consejo administracion_{expediente}', true, 'manual'],
                 ['Formulario conozca su cliente - juridica', null, 'Formulario conozca cliente juridica_{expediente}', true, 'manual'],
@@ -237,12 +246,6 @@ class DatabaseSeeder extends Seeder
                 ['Contrato de apertura de cuenta de ahorros', null, 'Contrato apertura cuenta ahorros_{expediente}', true, 'econx'],
                 ['No residente', null, 'No residente_{expediente}', true, 'econx'],
             ];
-
-            if ($accountType->slug === 'cuenta-basica') {
-                $items[] = ['Autorizacion para acreditacion del BDH', 'formatos/BDH.pdf', 'Autorizacion acreditacion BDH_{expediente}', false, 'manual'];
-                $items[] = ['Solicitud de reapertura de cuenta del BDH', 'formatos/BDH.pdf', 'Solicitud reapertura cuenta BDH_{expediente}', false, 'manual'];
-                $items[] = ['Autorizacion de cierre de cuenta BDH', 'formatos/BDH.pdf', 'Autorizacion cierre cuenta BDH_{expediente}', false, 'manual'];
-            }
         }
 
         $slugs = collect($items)->map(fn ($item) => $accountType->slug.'-'.Str::slug($item[0]))->all();
