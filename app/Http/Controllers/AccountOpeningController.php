@@ -17,6 +17,7 @@ use App\Models\SelectedAdditionalService;
 use App\Models\UploadedDocument;
 use App\Services\AutomatedReviewService;
 use App\Services\DocumentExtractionService;
+use App\Services\InternalDocumentPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -323,7 +324,7 @@ class AccountOpeningController extends Controller
             ->with('success', 'Evidencia externa guardada.');
     }
 
-    public function generateInternalDocument(Request $request, AccountOpening $opening, InternalDocumentTemplate $template)
+    public function generateInternalDocument(Request $request, AccountOpening $opening, InternalDocumentTemplate $template, InternalDocumentPdfService $pdfService)
     {
         $template = $this->internalTemplatesForOpening($opening)
             ->where('id', $template->id)
@@ -370,6 +371,13 @@ class AccountOpeningController extends Controller
         $downloadName = $this->downloadFileName($template, $opening).'.pdf';
 
         $this->audit($opening, 'generar_documento_interno', "Documento generado para descarga: {$template->name}.");
+
+        if ($this->isSignatureRegisterTemplate($template)) {
+            return response($pdfService->generate($opening, $template, $data), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.$downloadName.'"',
+            ]);
+        }
 
         return view('accounts.generated-documents.show', [
             'opening' => $opening,
@@ -713,6 +721,11 @@ class AccountOpeningController extends Controller
             || str_contains($slug, 'acreditacion')
             || str_contains($slug, 'reapertura')
             || str_contains($slug, 'cierre');
+    }
+
+    private function isSignatureRegisterTemplate(InternalDocumentTemplate $template): bool
+    {
+        return str_contains(strtolower($template->slug), 'registro-de-firmas');
     }
 
     private function consentDocumentDefaults(AccountOpening $opening): array
