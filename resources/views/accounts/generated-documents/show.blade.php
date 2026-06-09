@@ -254,12 +254,13 @@
 
         .bdh-title {
             margin: 0 -8mm 2.5mm;
-            padding: 1.4mm 5mm;
+            min-height: 14mm;
+            padding: 2mm 5mm;
             background: #0879bd;
             color: #fff;
             font-size: 13px;
             font-weight: 900;
-            line-height: 1.15;
+            line-height: 1.35;
             text-align: center;
             text-transform: uppercase;
         }
@@ -802,7 +803,10 @@
                     <span class="editable account" contenteditable="true" spellcheck="false">{{ $accountNumber }}</span>
                 </div>
 
-                <div class="bdh-title">SOLICITUD DE AUTORIZACIÓN PARA ACCEDER AL PAGO DE LA TRANSFERENCIA MONETARIA MEDIANTE DEPÓSITO EN</div>
+                <div class="bdh-title">
+                    SOLICITUD DE AUTORIZACIÓN PARA ACCEDER AL PAGO DE LA TRANSFERENCIA MONETARIA MEDIANTE<br>
+                    DEPÓSITO EN CUENTA
+                </div>
 
                 <div class="bdh-person-row">
                     <div class="bdh-person-part">
