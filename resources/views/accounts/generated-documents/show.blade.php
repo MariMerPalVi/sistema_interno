@@ -334,15 +334,15 @@
         }
 
         .bdh-document .editable.name {
-            width: 62mm;
-            min-width: 62mm;
+            width: 72mm;
+            min-width: 72mm;
             margin: 0 1.5mm;
             border-bottom: 1px solid #111;
         }
 
         .bdh-document .editable.id {
-            width: 38mm;
-            min-width: 38mm;
+            width: 34mm;
+            min-width: 34mm;
             margin-left: 1.5mm;
             text-align: center;
             border-bottom: 1px solid #111;
