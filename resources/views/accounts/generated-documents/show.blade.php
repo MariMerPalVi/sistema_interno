@@ -220,86 +220,203 @@
             outline: none;
         }
 
-        .bdh-document {
-            margin-top: 4mm;
-            font-size: 11px;
-            line-height: 1.42;
-            text-align: center;
+        .page.bdh-template {
+            padding: 0;
+            background: #fff;
         }
 
-        .bdh-account {
-            margin: -2mm 0 2mm;
-            text-align: right;
-            font-weight: 800;
+        .bdh-document {
+            position: relative;
+            min-height: 297mm;
+            padding: 4mm 8mm 0;
+            color: #000;
+            font-family: "Poppins", Arial, Helvetica, sans-serif;
+            font-size: 15px;
+            line-height: 1.38;
+        }
+
+        .bdh-logo {
+            width: 72mm;
+            height: auto;
+            margin-left: 1mm;
+        }
+
+        .bdh-account-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 9mm;
+            height: 10mm;
+            margin-top: 1mm;
+            padding-right: 8mm;
+            font-weight: 900;
         }
 
         .bdh-title {
-            margin: 0 0 3mm;
-            padding: 1.8mm 2mm;
+            margin: 0 -8mm 2.5mm;
+            padding: 1.4mm 5mm;
             background: #0879bd;
             color: #fff;
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 900;
+            line-height: 1.15;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .bdh-line {
+            margin: 0 0 2mm;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .bdh-line.center {
             text-align: center;
         }
 
-        .bdh-document p {
-            margin: 0 0 2.4mm;
-            font-size: 11px;
-            line-height: 1.45;
+        .bdh-line.justify {
             text-align: justify;
         }
 
+        .bdh-person-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+            align-items: end;
+            gap: 7mm;
+            margin-bottom: 4mm;
+            font-size: 14px;
+            line-height: 1.35;
+        }
+
+        .bdh-person-part {
+            display: flex;
+            align-items: baseline;
+            gap: 1.5mm;
+            min-width: 0;
+        }
+
+        .bdh-person-part.identity {
+            justify-content: flex-end;
+        }
+
+        .bdh-person-part.identity span:first-child {
+            flex: 0 1 auto;
+            max-width: 50mm;
+        }
+
+        .bdh-place-date {
+            display: flex;
+            align-items: baseline;
+            gap: 1.2mm;
+            margin-top: 1mm;
+            font-weight: 900;
+        }
+
+        .bdh-place-date .place {
+            min-width: 31mm;
+            margin-left: 1mm;
+            margin-right: 1mm;
+        }
+
+        .bdh-document strong {
+            font-weight: 900;
+        }
+
         .bdh-document .editable {
-            min-width: 34mm;
+            display: inline-block;
+            min-height: 5.2mm;
             padding: 0 1mm;
-            border-bottom: 1px solid #111;
+            border: 0;
+            background: transparent;
             font-weight: 800;
-            line-height: 1.15;
+            line-height: 1.25;
+            outline: none;
+            vertical-align: baseline;
         }
 
-        .bdh-document .editable.long {
-            min-width: 92mm;
+        .bdh-document .editable:focus {
+            background: rgba(8, 121, 189, .16);
+            box-shadow: inset 0 -2px 0 #0879bd;
         }
 
-        .bdh-document .editable.short {
-            min-width: 18mm;
+        .bdh-document .editable.name {
+            flex: 1 1 auto;
+            min-width: 44mm;
+            border-bottom: 1px solid transparent;
         }
 
-        .bdh-account .editable {
+        .bdh-document .editable.id {
+            flex: 0 0 32mm;
+            min-width: 32mm;
+            text-align: center;
+            border-bottom: 1px solid #111;
+        }
+
+        .bdh-document .editable.id:empty::before {
+            content: attr(data-placeholder);
+            color: transparent;
+            white-space: pre;
+        }
+
+        .bdh-document .editable.account {
             min-width: 30mm;
+            color: #000;
+            font-size: 18px;
+            font-weight: 900;
             text-align: center;
         }
 
-        .bdh-center {
+        .bdh-document .editable.benefit-account {
+            min-width: 45mm;
             text-align: center;
+        }
+
+        .bdh-document .editable.date {
+            min-width: 43mm;
+        }
+
+        .bdh-signature-row {
+            display: grid;
+            grid-template-columns: 92mm 45mm;
+            align-items: end;
+            column-gap: 22mm;
+            margin: 18mm 0 6mm 5mm;
         }
 
         .bdh-stamp {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 34mm;
-            height: 34mm;
-            margin: 4mm auto 5mm;
-            border: 1.5mm solid #1d5fc7;
-            border-radius: 50%;
-            color: #1d5fc7;
-            font-size: 9px;
-            font-weight: 900;
-            line-height: 1.05;
-            text-align: center;
-            transform: rotate(-8deg);
+            width: 42mm;
+            height: 42mm;
+            object-fit: contain;
+            justify-self: end;
         }
 
         .bdh-signature {
-            width: 88mm;
-            margin: 12mm 0 4mm 10mm;
-            border-top: 1px dashed #111;
-            padding-top: 2mm;
-            text-align: left;
-            font-size: 10px;
-            font-weight: 800;
+            width: 92mm;
+            margin: 0;
+        }
+
+        .bdh-signature .signature-edit {
+            display: block;
+            min-height: 9mm;
+            border-bottom: 1.6px dashed #111;
+            outline: none;
+        }
+
+        .bdh-signature .signature-name {
+            display: block;
+            min-height: 5mm;
+            padding-top: 1.5mm;
+            font-weight: 900;
+            outline: none;
+        }
+
+        .bdh-id-line {
+            margin-left: 5mm;
+            font-size: 13px;
+        }
+
+        .bdh-id-line .editable {
+            min-width: 48mm;
         }
 
         .brand-row {
@@ -405,7 +522,7 @@
         .firm-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 8mm;
+            margin-top: 5mm;
             font-size: 11px;
         }
 
@@ -435,6 +552,71 @@
             margin-top: 5mm;
             font-size: 11px;
             font-weight: 800;
+        }
+
+        .signature-register-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: start;
+            margin-bottom: 7mm;
+        }
+
+        .signature-register-header h1 {
+            margin: 6mm 0 0;
+            text-align: left;
+            font-size: 16px;
+            line-height: 1.2;
+        }
+
+        .signature-register-header img {
+            width: 46mm;
+            justify-self: center;
+        }
+
+        .signature-register .firm-table {
+            margin-top: 4mm;
+            font-size: 10px;
+        }
+
+        .signature-register .firm-table th,
+        .signature-register .firm-table td {
+            border: 1.5px solid #111;
+            padding: 1.7mm;
+        }
+
+        .signature-register .firm-table th {
+            width: 37%;
+        }
+
+        .signature-register .firm-box {
+            height: 31mm;
+        }
+
+        .signature-register .firm-box.large {
+            height: 43mm;
+        }
+
+        .signature-register .joint-signatures {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            height: 43mm;
+            margin: -1.7mm;
+        }
+
+        .signature-register .joint-signatures div {
+            display: flex;
+            align-items: flex-end;
+            padding: 1.7mm;
+        }
+
+        .signature-register .joint-signatures div + div {
+            border-top: 1.5px solid #111;
+        }
+
+        .signature-register .notice {
+            margin-top: 4mm;
+            font-size: 9.5px;
+            line-height: 1.35;
         }
 
         .generic-box {
@@ -471,6 +653,10 @@
                 display: none;
             }
 
+            .edit-hint {
+                display: none;
+            }
+
             .page {
                 margin: 0;
                 box-shadow: none;
@@ -488,8 +674,8 @@
         <button type="button" onclick="window.close()">Cerrar</button>
     </div>
 
-    <main class="page {{ $isApplication ? 'pdf-template' : '' }}">
-        @unless ($isApplication)
+    <main class="page {{ $isApplication ? 'pdf-template' : '' }} {{ $isBdh ? 'bdh-template' : '' }}">
+        @unless ($isApplication || $isSignatureRegister || $isBdh)
             <div class="watermark"></div>
             <div class="brand-row">
                 <img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
@@ -498,7 +684,11 @@
         @endunless
 
         @if ($isSignatureRegister)
-            <h1 style="text-align: left; margin-bottom: 8mm;">REGISTRO DE FIRMAS</h1>
+            <section class="signature-register">
+            <div class="signature-register-header">
+                <h1>REGISTRO DE FIRMAS</h1>
+                <img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
+            </div>
             <table class="firm-table">
                 <tr>
                     <th>CODIGO DE SOCIO</th>
@@ -530,21 +720,28 @@
                 <tr>
                     <th class="firm-box large">FIRMA CONJUNTA O INDISTINTA</th>
                     <td class="firm-box large">
-                        FIRMANTE 1 (Titular)
-                        <br><br><br>
-                        FIRMANTE 2
+                        <div class="joint-signatures">
+                            <div>FIRMANTE 1 (Titular)</div>
+                            <div>FIRMANTE 2</div>
+                        </div>
                     </td>
                 </tr>
             </table>
 
-            <p style="margin-top: 4mm;">
+            <p class="notice">
                 Estimado(s) firmante(s), le(s) informamos que esta firma se actualizara de forma automatica en todas las cuenta de ahorro donde usted(es) esten registrado(s) como firma autorizada.
+                Por lo tanto <strong>COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES</strong> devolvera los retiros/transferencias/notas de débito u otro medio de pago cuya firma no corresponda a esta actualizacion.
             </p>
             <p class="exclusive">PARA USO EXCLUSIVO DE LA COOPERATIVA</p>
             <table class="firm-table">
                 <tr><td style="height: 18mm;">Observaciones:</td><td>Firma:</td></tr>
                 <tr><td>Asistente Operativo</td><td>Fecha</td></tr>
             </table>
+            <table class="firm-table">
+                <tr><td style="height: 18mm;">Observaciones:</td><td>Firma:</td></tr>
+                <tr><td>Jefe de Captaciones</td><td>Fecha</td></tr>
+            </table>
+            </section>
         @elseif ($isApplication)
             <img class="template-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
             <section class="template-content application-document" aria-label="Solicitud de ingreso editable">
@@ -601,43 +798,56 @@
             </section>
         @elseif ($isBdh)
             <section class="bdh-document" aria-label="Autorizacion BDH editable">
-                <p class="bdh-account">
-                    CUENTA N°:
-                    <span class="editable short" contenteditable="true">{{ $accountNumber }}</span>
-                </p>
+                <img class="bdh-logo" src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
 
-                <div class="bdh-title">SOLICITUD DE AUTORIZACIÓN PARA ACCEDER AL PAGO DE LA TRANSFERENCIA MONETARIA MEDIANTE DEPÓSITO EN CUENTA</div>
+                <div class="bdh-account-row">
+                    <span>CUENTA N°:</span>
+                    <span class="editable account" contenteditable="true" spellcheck="false">{{ $accountNumber }}</span>
+                </div>
 
-                <p>
-                    <strong>Yo,</strong>
-                    <span class="editable long" contenteditable="true">{{ $fullName }}</span>,
-                    portador(a) de la cédula de identidad N°
-                    <span class="editable" contenteditable="true">{{ $identification }}</span>
-                </p>
-                <p>
+                <div class="bdh-title">SOLICITUD DE AUTORIZACIÓN PARA ACCEDER AL PAGO DE LA TRANSFERENCIA MONETARIA MEDIANTE DEPÓSITO EN</div>
+
+                <div class="bdh-person-row">
+                    <div class="bdh-person-part">
+                        <strong>Yo,</strong>
+                        <span class="editable name" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>
+                    </div>
+                    <div class="bdh-person-part identity">
+                        <span>portador(a) de la cédula de identidad N°</span>
+                        <span class="editable id" contenteditable="true" spellcheck="false" data-placeholder="0000000000">{{ $identification ?: '' }}</span>
+                    </div>
+                </div>
+                <p class="bdh-line justify">
                     en calidad de usuario de las Transferencias Monetarias MIES otorgado por el Gobierno Nacional, en forma expresa autorizo a la
                 </p>
-                <p class="bdh-center">
-                    COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES LTDA., a que se acredite mensualmente el monto del beneficio que me
+                <p class="bdh-line center">
+                    COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES LTDA., a que se acredite mensualmente el monto del beneficio que me corresponde; a mi cuenta de ahorros que mantengo en dicha institución:
                 </p>
-                <p class="bdh-center">
-                    corresponde; a mi cuenta de ahorros que mantengo en dicha institución:
-                </p>
-                <p class="bdh-center">
+                <p class="bdh-line center">
                     <strong>Número de Cuenta:</strong>
-                    <span class="editable short" contenteditable="true">{{ $accountNumber }}</span>
+                    <span class="editable benefit-account" contenteditable="true" spellcheck="false">{{ $accountNumber }}</span>
                 </p>
-                <p>
+                <p class="bdh-line justify">
                     Para constancia suscribo el presente documento y/o (imprimo la huella digital de mi pulgar derecho).
                 </p>
-                <p>
-                    <strong>Lugar y Fecha : Las Naves,</strong>
-                    <span class="editable" contenteditable="true">{{ $day }} de {{ $month }} del {{ $year }}</span>
+                <p class="bdh-line bdh-place-date">
+                    <strong>Lugar y Fecha :</strong>
+                    <span class="editable place" contenteditable="true" spellcheck="false">{{ $city ?: 'Las Naves' }}</span>
+                    <span>,</span>
+                    <span class="editable date" contenteditable="true" spellcheck="false">{{ $day }} de {{ $month }} del {{ $year }}</span>
                 </p>
 
-                <div class="bdh-stamp">LAS NAVES<br>COOPERATIVA DE<br>AHORRO Y CRÉDITO</div>
-
-                <div class="bdh-signature">Cédula: <span contenteditable="true">{{ $identification }}</span></div>
+                <div class="bdh-signature-row">
+                    <div class="bdh-signature">
+                        <span class="signature-edit" contenteditable="true" spellcheck="false"></span>
+                        <span class="signature-name" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>
+                    </div>
+                    <img class="bdh-stamp" src="{{ asset('images/sello-las-naves.png') }}" alt="Sello Las Naves">
+                </div>
+                <div class="bdh-id-line">
+                    <strong>Cédula:</strong>
+                    <span class="editable" contenteditable="true" spellcheck="false">{{ $identification ?: ' ' }}</span>
+                </div>
             </section>
         @else
             <h1>{{ strtoupper($template->name) }}</h1>

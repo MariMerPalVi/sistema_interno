@@ -37,6 +37,12 @@
         'servicios' => '5. Servicios',
         'resumen' => '6. Check List',
     ];
+    $storageRoot = storage_path('app/private');
+    $expedientStoragePath = $storageRoot.DIRECTORY_SEPARATOR.'aperturas'.DIRECTORY_SEPARATOR.str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $opening->storage_folder);
+    $documentStoragePath = fn (?string $path) => $path
+        ? $storageRoot.DIRECTORY_SEPARATOR.str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path)
+        : null;
+    $checkLoadedMark = fn ($path) => $path ? 'X' : '';
 @endphp
 
 @section('content')
@@ -359,55 +365,128 @@
             <div><strong>Estado</strong><span>{{ str_replace('_', ' ', $opening->status) }}</span></div>
             <div><strong>Revision digital</strong><span>{{ $opening->ai_review_status ? str_replace('_', ' ', $opening->ai_review_status).' ('.$opening->ai_review_score.'%)' : 'Pendiente' }}</span></div>
         </div>
-        @if ($opening->ai_review_result)
-            <h3>Resultado de revision digital</h3>
-            <div class="ai-review">
-                <strong>{{ $opening->ai_review_result['summary'] ?? 'Revision digital ejecutada.' }}</strong>
-                <span>Fecha: {{ $opening->ai_reviewed_at?->format('d/m/Y H:i') }}</span>
-                @if (!empty($opening->ai_review_result['findings']))
-                    <div class="checklist">
-                        @foreach ($opening->ai_review_result['findings'] as $finding)
-                            <article class="check-item compact">
-                                <div>
-                                    <h3>{{ $finding['subject'] ?? 'Hallazgo' }}</h3>
-                                    <p>{{ $finding['message'] ?? '' }}</p>
-                                    @include('partials.badge', ['status' => ($finding['severity'] ?? 'warning') === 'error' ? 'observado' : 'con_observacion'])
-                                </div>
-                            </article>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
-        @endif
-        <h3>Documentos adjuntados</h3>
-        <div class="checklist">
-            @foreach ($opening->documents->sortBy(['document_scope', 'display_name']) as $document)
-                <article class="check-item compact">
-                    <div>
-                        <h3>{{ $document->display_name }}</h3>
-                        <p>{{ ucfirst($document->document_scope) }} - {{ basename($document->file_path) }}</p>
-                        @include('partials.badge', ['status' => $document->status])
-                    </div>
-                </article>
-            @endforeach
-            @if ($opening->consent?->signed_file_path)
-                <article class="check-item compact">
-                    <div>
-                        <h3>Consentimiento para el Tratamiento de Datos Personales</h3>
-                        <p>{{ basename($opening->consent->signed_file_path) }}</p>
-                        @include('partials.badge', ['status' => $opening->consent->status])
-                    </div>
-                </article>
-            @endif
-            @if ($opening->externalEvidences->whereNotNull('screenshot_path')->first())
-                <article class="check-item compact">
-                    <div>
-                        <h3>Revision listas de control</h3>
-                        <p>{{ basename($opening->externalEvidences->whereNotNull('screenshot_path')->first()->screenshot_path) }}</p>
-                        @include('partials.badge', ['status' => 'cargado'])
-                    </div>
-                </article>
-            @endif
+        <div class="checklist-storage">
+            <strong>Carpeta del expediente</strong>
+            <code>{{ $expedientStoragePath }}</code>
+            <button class="button secondary" type="button" onclick="window.print()">Guardar / imprimir Check List</button>
+        </div>
+
+        <div class="official-check-wrap">
+            <table class="official-checklist">
+                <tbody>
+                    <tr class="official-head">
+                        <td colspan="6">
+                            <strong>CHECK LIST DE DOCUMENTOS DE LA APERTURA DE CUENTA</strong>
+                            <span>ARCHIVO FISICO</span>
+                        </td>
+                        <td colspan="6" class="official-logo"><img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" class="socio-label">SOCIO N°</td>
+                        <td colspan="6" class="socio-number">{{ $opening->file_name }}</td>
+                    </tr>
+                    <tr class="section-row">
+                        <td colspan="6">{{ str_contains(strtolower($opening->accountType->name), 'jurid') ? 'PERSONAS JURIDICAS' : 'PERSONAS NATURALES' }}</td>
+                        <td>Asis.<br>Op</td>
+                        <td>Jefe<br>Cap</td>
+                        <td>Cump.</td>
+                        <td>Riesg.</td>
+                        <td>C. Vig</td>
+                        <td>A.<br>Ext/Int</td>
+                    </tr>
+
+                    @php $rowNumber = 1; @endphp
+                    @foreach ($internalTemplates->where('is_required', true) as $template)
+                        @php $doc = $internalDocs->get($template->id); @endphp
+                        <tr>
+                            <td class="num">{{ $rowNumber++ }}</td>
+                            <td colspan="5">{{ $template->name }} ({{ $template->source === 'manual' ? 'manual' : 'sistema' }})</td>
+                            <td>{{ $checkLoadedMark($doc?->file_path) }}</td>
+                            <td></td><td></td><td></td><td></td><td></td>
+                        </tr>
+                    @endforeach
+
+                    <tr>
+                        <td class="num">{{ $rowNumber++ }}</td>
+                        <td colspan="5">Consentimiento para el Tratamiento de Datos Personales</td>
+                        <td>{{ $checkLoadedMark($opening->consent?->signed_file_path) }}</td>
+                        <td></td><td></td><td></td><td></td><td></td>
+                    </tr>
+
+                    @if ($requiredExternalIds->isNotEmpty())
+                        @php $externalEvidence = $opening->externalEvidences->whereNotNull('screenshot_path')->first(); @endphp
+                        <tr>
+                            <td class="num">{{ $rowNumber++ }}</td>
+                            <td colspan="5">Revision listas de control (manual)</td>
+                            <td>{{ $checkLoadedMark($externalEvidence?->screenshot_path) }}</td>
+                            <td></td><td></td><td></td><td></td><td></td>
+                        </tr>
+                    @endif
+
+                    <tr class="section-row">
+                        <td colspan="12">ARCHIVO DIGITAL</td>
+                    </tr>
+
+                    @php $digitalNumber = 1; @endphp
+                    @foreach ($opening->accountType->requirements as $requirement)
+                        @php
+                            $isSpouseRequirement = $requirement->type->slug === 'documentos-conyuge';
+                            $isRequiredForOpening = $requirement->is_required || ($isSpouseRequirement && $opening->requires_spouse_documents);
+                            $doc = $requirementDocs->get($requirement->id);
+                        @endphp
+                        @continue(!$isRequiredForOpening)
+                        <tr>
+                            <td class="num">{{ $digitalNumber++ }}</td>
+                            <td colspan="5">{{ $requirement->label }}{{ $doc?->file_path ? ' - '.basename($doc->file_path) : '' }}</td>
+                            <td>{{ $checkLoadedMark($doc?->file_path) }}</td>
+                            <td></td><td></td><td></td><td></td><td></td>
+                        </tr>
+                    @endforeach
+
+                    @foreach ($internalTemplates->where('is_required', true) as $template)
+                        @php $doc = $internalDocs->get($template->id); @endphp
+                        <tr>
+                            <td class="num">{{ $digitalNumber++ }}</td>
+                            <td colspan="5">{{ $template->name }}{{ $doc?->file_path ? ' - '.basename($doc->file_path) : '' }}</td>
+                            <td>{{ $checkLoadedMark($doc?->file_path) }}</td>
+                            <td></td><td></td><td></td><td></td><td></td>
+                        </tr>
+                    @endforeach
+
+                    @if ($opening->consent?->signed_file_path)
+                        <tr>
+                            <td class="num">{{ $digitalNumber++ }}</td>
+                            <td colspan="5">Consentimiento de datos personales - {{ basename($opening->consent->signed_file_path) }}</td>
+                            <td>X</td>
+                            <td></td><td></td><td></td><td></td><td></td>
+                        </tr>
+                    @endif
+
+                    <tr class="path-row">
+                        <td colspan="12"><strong>Ruta del expediente:</strong> {{ $expedientStoragePath }}</td>
+                    </tr>
+                    <tr class="signature-row">
+                        <td colspan="6">Observaciones:</td>
+                        <td colspan="6">Firma:</td>
+                    </tr>
+                    <tr><td colspan="6">Asistente Operativo</td><td colspan="6">Fecha</td></tr>
+                    <tr class="signature-row">
+                        <td colspan="6">Observaciones:</td>
+                        <td colspan="6">Firma:</td>
+                    </tr>
+                    <tr><td colspan="6">Jefe de Captaciones</td><td colspan="6">Fecha</td></tr>
+                    <tr class="signature-row">
+                        <td colspan="6">Observaciones:</td>
+                        <td colspan="6">Firma:</td>
+                    </tr>
+                    <tr><td colspan="6">Oficial de Cumplimiento</td><td colspan="6">Fecha</td></tr>
+                    <tr class="signature-row">
+                        <td colspan="6">Observaciones:</td>
+                        <td colspan="6">Firma:</td>
+                    </tr>
+                    <tr><td colspan="6">Administrador de Riesgos</td><td colspan="6">Fecha</td></tr>
+                </tbody>
+            </table>
         </div>
         <form method="post" action="{{ route('accounts.submit', $opening) }}">
             @csrf
