@@ -265,9 +265,9 @@
         }
 
         .bdh-line {
-            margin: 0 0 2mm;
-            font-size: 14px;
-            line-height: 1.5;
+            margin: 0 0 2.4mm;
+            font-size: 13px;
+            line-height: 1.55;
         }
 
         .bdh-line.center {
@@ -279,36 +279,30 @@
         }
 
         .bdh-person-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-            align-items: end;
-            gap: 7mm;
-            margin-bottom: 4mm;
-            font-size: 14px;
-            line-height: 1.35;
+            display: block;
+            margin-bottom: 2.4mm;
+            font-size: 13px;
+            line-height: 1.55;
         }
 
         .bdh-person-part {
-            display: flex;
-            align-items: baseline;
-            gap: 1.5mm;
-            min-width: 0;
+            display: inline;
         }
 
         .bdh-person-part.identity {
-            justify-content: flex-end;
+            display: inline;
         }
 
         .bdh-person-part.identity span:first-child {
-            flex: 0 1 auto;
-            max-width: 50mm;
+            white-space: normal;
         }
 
         .bdh-place-date {
-            display: flex;
+            display: grid;
+            grid-template-columns: auto minmax(28mm, 42mm) auto minmax(45mm, 1fr);
             align-items: baseline;
-            gap: 1.2mm;
-            margin-top: 1mm;
+            gap: 1.4mm;
+            margin-top: 2mm;
             font-weight: 900;
         }
 
@@ -340,14 +334,16 @@
         }
 
         .bdh-document .editable.name {
-            flex: 1 1 auto;
-            min-width: 44mm;
-            border-bottom: 1px solid transparent;
+            width: 62mm;
+            min-width: 62mm;
+            margin: 0 1.5mm;
+            border-bottom: 1px solid #111;
         }
 
         .bdh-document .editable.id {
-            flex: 0 0 32mm;
-            min-width: 32mm;
+            width: 38mm;
+            min-width: 38mm;
+            margin-left: 1.5mm;
             text-align: center;
             border-bottom: 1px solid #111;
         }
@@ -372,7 +368,8 @@
         }
 
         .bdh-document .editable.date {
-            min-width: 43mm;
+            width: 100%;
+            min-width: 45mm;
         }
 
         .bdh-signature-row {
@@ -818,10 +815,7 @@
                     </div>
                 </div>
                 <p class="bdh-line justify">
-                    en calidad de usuario de las Transferencias Monetarias MIES otorgado por el Gobierno Nacional, en forma expresa autorizo a la
-                </p>
-                <p class="bdh-line center">
-                    COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES LTDA., a que se acredite mensualmente el monto del beneficio que me corresponde; a mi cuenta de ahorros que mantengo en dicha institución:
+                    en calidad de usuario de las Transferencias Monetarias MIES otorgado por el Gobierno Nacional, en forma expresa autorizo a la COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES LTDA., a que se acredite mensualmente el monto del beneficio que me corresponde; a mi cuenta de ahorros que mantengo en dicha institución:
                 </p>
                 <p class="bdh-line center">
                     <strong>Número de Cuenta:</strong>
