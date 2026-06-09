@@ -26,6 +26,8 @@ Route::prefix('aperturas')->name('accounts.')->group(function () {
     Route::get('/{opening}/documentos-internos/{template}/generar', [AccountOpeningController::class, 'generateInternalDocument'])->name('internal.generate');
     Route::get('/{opening}/documentos-internos/{template}/original', [AccountOpeningController::class, 'showInternalOriginal'])->name('internal.original');
     Route::post('/{opening}/documentos-internos', [AccountOpeningController::class, 'uploadInternalDocument'])->name('internal.upload');
+    Route::get('/{opening}/servicios/documentos/{template}/generar', [AccountOpeningController::class, 'generateServiceDocument'])->name('services.documents.generate');
+    Route::get('/{opening}/servicios/documentos/{template}/original', [AccountOpeningController::class, 'showServiceOriginal'])->name('services.documents.original');
     Route::post('/{opening}/servicios/documentos', [AccountOpeningController::class, 'uploadServiceDocument'])->name('services.documents.upload');
     Route::post('/{opening}/servicios', [AccountOpeningController::class, 'saveServices'])->name('services.save');
     Route::post('/{opening}/enviar-revision', [AccountOpeningController::class, 'submitReview'])->name('submit');

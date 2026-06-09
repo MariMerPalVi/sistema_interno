@@ -3,6 +3,7 @@
     $isSignatureRegister = str_contains($slug, 'registro-de-firmas');
     $isApplication = str_contains($slug, 'solicitud-de-ingreso');
     $isBdh = str_contains($slug, 'bdh') || str_contains($slug, 'acreditacion') || str_contains($slug, 'reapertura') || str_contains($slug, 'cierre');
+    $isNoMortuaryFund = str_contains($slug, 'sin-fondo-mortuorio');
     $fullName = trim(preg_replace('/\s+/', ' ', $fields['apellidos_nombres'] ?? ''));
     $identification = preg_replace('/\D+/', '', $fields['cedula_identidad'] ?? '');
     $accountNumber = $fields['cuenta_numero'] ?? $opening->file_name;
@@ -415,6 +416,62 @@
 
         .bdh-id-line .editable {
             min-width: 48mm;
+        }
+
+        .no-mortuary-document {
+            position: relative;
+            min-height: 255mm;
+            padding: 8mm 10mm;
+            font-family: "Poppins", Arial, Helvetica, sans-serif;
+            color: #111827;
+            font-size: 13px;
+            line-height: 1.75;
+        }
+
+        .no-mortuary-document .brand-row {
+            margin-bottom: 18mm;
+        }
+
+        .no-mortuary-document h1 {
+            margin: 0 0 14mm;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .no-mortuary-document p {
+            margin: 0 0 7mm;
+            text-align: justify;
+        }
+
+        .no-mortuary-document .editable-line {
+            display: inline-block;
+            min-width: 55mm;
+            padding: 0 2mm;
+            border-bottom: 1px solid #111;
+            font-weight: 700;
+            outline: none;
+        }
+
+        .no-mortuary-document .editable-line.short {
+            min-width: 35mm;
+        }
+
+        .no-mortuary-signature {
+            width: 80mm;
+            margin: 28mm auto 0;
+            text-align: center;
+        }
+
+        .no-mortuary-signature span {
+            display: block;
+            min-height: 12mm;
+            border-bottom: 1px solid #111;
+            outline: none;
+        }
+
+        .no-mortuary-signature strong {
+            display: block;
+            padding-top: 2mm;
         }
 
         .brand-row {
@@ -845,6 +902,34 @@
                 <div class="bdh-id-line">
                     <strong>Cédula:</strong>
                     <span class="editable" contenteditable="true" spellcheck="false">{{ $identification ?: ' ' }}</span>
+                </div>
+            </section>
+        @elseif ($isNoMortuaryFund)
+            <section class="no-mortuary-document" aria-label="Declaracion sin fondo mortuorio editable">
+                <h1>DECLARACIÓN DE NO AFILIACIÓN AL FONDO MORTUORIO</h1>
+
+                <p>
+                    Yo,
+                    <span class="editable-line" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>,
+                    portador(a) de la cédula de identidad N°
+                    <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $identification ?: ' ' }}</span>,
+                    declaro de manera libre y voluntaria que no deseo afiliarme ni ser beneficiario(a) del servicio de Fondo Mortuorio ofrecido por la Cooperativa de Ahorro y Crédito Las Naves.
+                </p>
+
+                <p>
+                    Manifiesto que he recibido información sobre este servicio y acepto que mi decisión quede registrada dentro del expediente de apertura de cuenta.
+                </p>
+
+                <p>
+                    Lugar:
+                    <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $city ?: 'Las Naves' }}</span>
+                    Fecha:
+                    <span class="editable-line" contenteditable="true" spellcheck="false">{{ $day }} de {{ $month }} del {{ $year }}</span>
+                </p>
+
+                <div class="no-mortuary-signature">
+                    <span contenteditable="true" spellcheck="false"></span>
+                    <strong>Firma del socio</strong>
                 </div>
             </section>
         @else

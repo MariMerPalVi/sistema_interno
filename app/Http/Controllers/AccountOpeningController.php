@@ -448,13 +448,20 @@ class AccountOpeningController extends Controller
         }
 
         $data = $request->validate([
+            'fondo_mortuorio' => ['required', Rule::in(['si', 'no'])],
             'services' => ['nullable', 'array'],
             'services.*' => ['exists:additional_services,id'],
         ]);
 
         DB::transaction(function () use ($opening, $data) {
             SelectedAdditionalService::where('account_opening_id', $opening->id)->delete();
-            foreach ($data['services'] ?? [] as $serviceId) {
+            $fondoId = AdditionalService::where('slug', 'fondo-mortuorio')->value('id');
+            $serviceIds = collect($data['services'] ?? [])->reject(fn ($id) => (int) $id === (int) $fondoId);
+            if ($data['fondo_mortuorio'] === 'si') {
+                $serviceIds->push($fondoId);
+            }
+
+            foreach ($serviceIds->filter()->unique() as $serviceId) {
                 SelectedAdditionalService::create([
                     'account_opening_id' => $opening->id,
                     'additional_service_id' => $serviceId,
@@ -463,11 +470,56 @@ class AccountOpeningController extends Controller
             }
         });
 
-        $this->audit($opening, 'seleccionar_servicios', 'Servicios adicionales actualizados.');
+        $this->audit(
+            $opening,
+            'seleccionar_servicios',
+            'Servicios adicionales actualizados.',
+            ['fondo_mortuorio' => $data['fondo_mortuorio']]
+        );
 
         return redirect()
             ->route('accounts.show', [$opening, 'paso' => 'servicios'])
             ->with('success', 'Servicios adicionales guardados.');
+    }
+
+    public function generateServiceDocument(Request $request, AccountOpening $opening, InternalDocumentTemplate $template)
+    {
+        $template = $this->serviceDocumentTemplates()->where('id', $template->id)->firstOrFail();
+
+        if (!$template->template_path) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'servicios'])
+                ->withErrors('El formato de este servicio aun esta pendiente de incorporar.');
+        }
+
+        $data = array_merge($this->documentDownloadDefaults($opening), $request->only([
+            'apellidos_nombres',
+            'cedula_identidad',
+            'cuenta_numero',
+            'ciudad',
+            'dia',
+            'mes',
+            'anio',
+        ]));
+
+        return view('accounts.generated-documents.show', [
+            'opening' => $opening->fresh('accountType'),
+            'template' => $template,
+            'fields' => $data,
+            'downloadName' => $this->downloadFileName($template, $opening).'.pdf',
+        ]);
+    }
+
+    public function showServiceOriginal(AccountOpening $opening, InternalDocumentTemplate $template)
+    {
+        $template = $this->serviceDocumentTemplates()->where('id', $template->id)->firstOrFail();
+
+        abort_unless($template->template_path && is_file(public_path($template->template_path)), 404);
+
+        return response()->file(public_path($template->template_path), [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.basename($template->template_path).'"',
+        ]);
     }
 
     public function uploadServiceDocument(Request $request, AccountOpening $opening)
@@ -1114,6 +1166,35 @@ class AccountOpeningController extends Controller
         ];
     }
 
+    private function fondoMortuorioDecision(AccountOpening $opening): ?string
+    {
+        return data_get($opening->histories()
+            ->where('action', 'seleccionar_servicios')
+            ->latest('id')
+            ->first()?->metadata, 'fondo_mortuorio');
+    }
+
+    private function requiredServiceTemplateSlugs(AccountOpening $opening)
+    {
+        $selectedSlugs = $opening->services()
+            ->join('additional_services', 'additional_services.id', '=', 'selected_additional_services.additional_service_id')
+            ->pluck('additional_services.slug')
+            ->reject(fn ($slug) => $slug === 'fondo-mortuorio');
+
+        $templateSlugs = $selectedSlugs
+            ->map(fn ($slug) => $this->serviceDocumentMap()[$slug] ?? null)
+            ->filter();
+
+        $decision = $this->fondoMortuorioDecision($opening);
+        if ($decision === 'si') {
+            $templateSlugs->push('formulario-servicio-fondo-mortuorio');
+        } elseif ($decision === 'no') {
+            $templateSlugs->push('sin-fondo-mortuorio');
+        }
+
+        return $templateSlugs->unique()->values();
+    }
+
     private function servicesStepIsComplete(AccountOpening $opening): bool
     {
         return $opening->histories()->where('action', 'seleccionar_servicios')->exists();
@@ -1125,19 +1206,19 @@ class AccountOpeningController extends Controller
             return false;
         }
 
-        $selectedSlugs = $opening->services()
-            ->join('additional_services', 'additional_services.id', '=', 'selected_additional_services.additional_service_id')
-            ->pluck('additional_services.slug');
-        $templateSlugs = $selectedSlugs
-            ->map(fn ($slug) => $this->serviceDocumentMap()[$slug] ?? null)
-            ->filter()
-            ->values();
+        $templateSlugs = $this->requiredServiceTemplateSlugs($opening);
 
         if ($templateSlugs->isEmpty()) {
             return true;
         }
 
-        $requiredIds = $this->serviceDocumentTemplates()->whereIn('slug', $templateSlugs)->pluck('id');
+        $requiredIds = $this->serviceDocumentTemplates()
+            ->whereIn('slug', $templateSlugs)
+            ->where(function ($query) {
+                $query->whereNotNull('template_path')
+                    ->orWhere('slug', '!=', 'formulario-servicio-fondo-mortuorio');
+            })
+            ->pluck('id');
         $loadedIds = $opening->documents()
             ->where('document_scope', 'servicio')
             ->whereIn('status', ['cargado', 'validado'])

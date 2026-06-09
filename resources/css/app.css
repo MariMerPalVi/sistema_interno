@@ -698,6 +698,26 @@ pre {
   background: var(--subtle);
 }
 
+.service-decision {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin: 0;
+}
+
+.service-decision legend {
+  margin-right: auto;
+  padding: 0;
+  font-weight: 800;
+}
+
+.service-decision label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 800;
+}
+
 .service-option {
   display: flex;
   align-items: center;

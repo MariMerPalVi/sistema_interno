@@ -151,7 +151,8 @@ class DatabaseSeeder extends Seeder
 
         foreach ([
             ['Formulario del servicio de fondo mortuorio', 'formulario-servicio-fondo-mortuorio', null, 'Formulario servicio Fondo Mortuorio_{expediente}', 1],
-            ['Solicitud de tarjeta de debito', 'solicitud-tarjeta-de-debito', null, 'Solicitud tarjeta de debito_{expediente}', 2],
+            ['Declaracion sin fondo mortuorio', 'sin-fondo-mortuorio', 'formatos/SIN_FONDO_MORTUORIO.pdf', 'Sin Fondo Mortuorio_{expediente}', 2],
+            ['Solicitud de tarjeta de debito', 'solicitud-tarjeta-de-debito', null, 'Solicitud tarjeta de debito_{expediente}', 3],
         ] as [$name, $slug, $templatePath, $pattern, $order]) {
             InternalDocumentTemplate::updateOrCreate(['slug' => $slug], [
                 'account_type_id' => null,

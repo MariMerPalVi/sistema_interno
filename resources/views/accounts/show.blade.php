@@ -24,11 +24,26 @@
     $servicesComplete = $opening->histories->contains('action', 'seleccionar_servicios');
     $serviceTemplatesBySlug = $serviceTemplates->keyBy('slug');
     $selectedServiceModels = $services->whereIn('id', $selectedServices);
-    $selectedServiceTemplateIds = $selectedServiceModels
+    $fondoDecision = data_get(
+        $opening->histories->where('action', 'seleccionar_servicios')->sortByDesc('id')->first()?->metadata,
+        'fondo_mortuorio'
+    );
+    $selectedServiceTemplateSlugs = $selectedServiceModels
+        ->reject(fn ($service) => $service->slug === 'fondo-mortuorio')
         ->map(fn ($service) => $serviceTemplatesBySlug->get($serviceDocumentMap[$service->slug] ?? null)?->id)
         ->filter();
+    if ($fondoDecision === 'si') {
+        $selectedServiceTemplateSlugs->push($serviceTemplatesBySlug->get('formulario-servicio-fondo-mortuorio')?->id);
+    } elseif ($fondoDecision === 'no') {
+        $selectedServiceTemplateSlugs->push($serviceTemplatesBySlug->get('sin-fondo-mortuorio')?->id);
+    }
+    $selectedServiceTemplateIds = $selectedServiceTemplateSlugs->filter()->unique()->values();
+    $selectedServiceDocumentTemplates = $serviceTemplates->whereIn('id', $selectedServiceTemplateIds);
+    $availableRequiredServiceTemplateIds = $selectedServiceDocumentTemplates
+        ->reject(fn ($template) => $template->slug === 'formulario-servicio-fondo-mortuorio' && !$template->template_path)
+        ->pluck('id');
     $loadedServiceIds = $opening->documents->where('document_scope', 'servicio')->whereIn('status', ['cargado', 'validado'])->pluck('internal_document_template_id');
-    $serviceDocsComplete = $servicesComplete && $selectedServiceTemplateIds->diff($loadedServiceIds)->isEmpty();
+    $serviceDocsComplete = $servicesComplete && $availableRequiredServiceTemplateIds->diff($loadedServiceIds)->isEmpty();
     $steps = [
         'consentimiento' => '1. Consentimiento',
         'requisitos' => '2. Requisitos',
@@ -294,7 +309,12 @@
         <form method="post" action="{{ route('accounts.services.save', $opening) }}">
             @csrf
             <div class="service-grid">
-                @foreach ($services as $service)
+                <fieldset class="service-option service-decision">
+                    <legend>Fondo mortuorio</legend>
+                    <label><input type="radio" name="fondo_mortuorio" value="si" @checked($fondoDecision === 'si') required> Sí</label>
+                    <label><input type="radio" name="fondo_mortuorio" value="no" @checked($fondoDecision === 'no') required> No</label>
+                </fieldset>
+                @foreach ($services->reject(fn ($service) => $service->slug === 'fondo-mortuorio') as $service)
                     <label class="service-option">
                         <input type="checkbox" name="services[]" value="{{ $service->id }}" @checked(in_array($service->id, $selectedServices))>
                         <span>{{ $service->name }}</span>
@@ -305,26 +325,30 @@
                 <button class="button primary" type="submit">Guardar servicios</button>
             </div>
         </form>
-        @if ($servicesComplete && $selectedServiceModels->isNotEmpty())
-            <h3>Documentos de servicios seleccionados</h3>
+        @if ($servicesComplete && $selectedServiceDocumentTemplates->isNotEmpty())
+            <h3>Documentos según servicios seleccionados</h3>
             <div class="checklist">
-                @foreach ($selectedServiceModels as $service)
+                @foreach ($selectedServiceDocumentTemplates as $template)
                     @php
-                        $template = $serviceTemplatesBySlug->get($serviceDocumentMap[$service->slug] ?? null);
-                        $doc = $template ? $serviceDocs->get($template->id) : null;
+                        $doc = $serviceDocs->get($template->id);
                     @endphp
-                    @if ($template)
-                        <article class="check-item">
-                            <div>
-                                <h3>{{ $template->name }}</h3>
-                                @if ($template->template_path)
-                                    <a href="{{ asset($template->template_path) }}" target="_blank">Descargar formato</a>
-                                @else
-                                    <span class="hint">Documento generado por el proceso del servicio</span>
-                                @endif
-                                <p class="hint">Se guardara como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>
-                                @include('partials.badge', ['status' => $doc->status ?? 'pendiente'])
-                            </div>
+                    <article class="check-item">
+                        <div>
+                            <h3>{{ $template->name }}</h3>
+                            @if ($template->slug === 'formulario-servicio-fondo-mortuorio' && !$template->template_path)
+                                <span class="hint">Formato pendiente de incorporar.</span>
+                            @elseif ($template->template_path)
+                                <div class="doc-actions">
+                                    <a href="{{ route('accounts.services.documents.generate', [$opening, $template]) }}" target="_blank">Abrir documento editable</a>
+                                    <a href="{{ route('accounts.services.documents.original', [$opening, $template]) }}" target="_blank">Ver documento original</a>
+                                </div>
+                            @else
+                                <span class="hint">Documento generado por el proceso del servicio</span>
+                            @endif
+                            <p class="hint">Se guardara como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>
+                            @include('partials.badge', ['status' => $doc->status ?? 'pendiente'])
+                        </div>
+                        @if ($template->template_path || $template->slug !== 'formulario-servicio-fondo-mortuorio')
                             <form method="post" enctype="multipart/form-data" action="{{ route('accounts.services.documents.upload', $opening) }}">
                                 @csrf
                                 <input type="hidden" name="internal_document_template_id" value="{{ $template->id }}">
@@ -337,8 +361,8 @@
                                 </select>
                                 <button class="button secondary" type="submit">{{ $doc ? 'Reemplazar' : 'Subir' }}</button>
                             </form>
-                        </article>
-                    @endif
+                        @endif
+                    </article>
                 @endforeach
             </div>
         @endif
