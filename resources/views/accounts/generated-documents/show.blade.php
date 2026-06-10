@@ -421,57 +421,135 @@
         .no-mortuary-document {
             position: relative;
             min-height: 255mm;
-            padding: 8mm 10mm;
+            padding: 4mm 5mm;
             font-family: "Poppins", Arial, Helvetica, sans-serif;
-            color: #111827;
-            font-size: 13px;
-            line-height: 1.75;
+            color: #111;
+            font-size: 11px;
+            line-height: 1.45;
         }
 
-        .no-mortuary-document .brand-row {
-            margin-bottom: 18mm;
+        .no-mortuary-header {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: end;
+            margin-bottom: 8mm;
         }
 
-        .no-mortuary-document h1 {
-            margin: 0 0 14mm;
-            font-size: 18px;
+        .no-mortuary-header img {
+            width: 103mm;
+            height: auto;
+        }
+
+        .no-mortuary-account {
+            display: flex;
+            align-items: baseline;
+            gap: 5mm;
+            padding-right: 8mm;
+            font-size: 10px;
+            font-weight: 900;
+        }
+
+        .no-mortuary-account .editable-line {
+            min-width: 24mm;
+            color: #e20b13;
+            font-size: 17px;
+        }
+
+        .no-mortuary-title {
+            margin: 0 -5mm 7mm;
+            padding: 2mm;
+            background: #0879bd;
+            color: #fff;
+            font-size: 16px;
             text-align: center;
         }
 
         .no-mortuary-document p {
-            margin: 0 0 7mm;
-            text-align: justify;
+            margin: 0 0 3mm;
         }
 
         .no-mortuary-document .editable-line {
             display: inline-block;
-            min-width: 55mm;
-            padding: 0 2mm;
-            border-bottom: 1px solid #111;
-            font-weight: 700;
+            min-width: 48mm;
+            padding: 0 1mm;
+            border-bottom: 1px solid transparent;
+            font-weight: 800;
             outline: none;
         }
 
         .no-mortuary-document .editable-line.short {
-            min-width: 35mm;
+            min-width: 28mm;
         }
 
-        .no-mortuary-signature {
-            width: 80mm;
-            margin: 28mm auto 0;
+        .no-mortuary-document .editable-line:focus,
+        .no-mortuary-check:focus {
+            background: rgba(8, 121, 189, .14);
+            border-bottom-color: #0879bd;
+        }
+
+        .no-mortuary-intro {
+            display: grid;
+            grid-template-columns: auto minmax(50mm, 1fr) auto;
+            align-items: baseline;
+            gap: 2mm;
+        }
+
+        .no-mortuary-reasons {
+            display: grid;
+            gap: 1.6mm;
+            margin: 2mm 0 3mm;
+        }
+
+        .no-mortuary-reason {
+            display: grid;
+            grid-template-columns: 7mm 1fr;
+            align-items: baseline;
+        }
+
+        .no-mortuary-check {
+            min-height: 5mm;
+            font-weight: 900;
             text-align: center;
-        }
-
-        .no-mortuary-signature span {
-            display: block;
-            min-height: 12mm;
-            border-bottom: 1px solid #111;
             outline: none;
         }
 
-        .no-mortuary-signature strong {
+        .no-mortuary-date {
+            display: flex;
+            align-items: baseline;
+            gap: 2mm;
+            font-weight: 800;
+        }
+
+        .no-mortuary-signature {
+            width: 72mm;
+            margin: 27mm 0 0;
+        }
+
+        .no-mortuary-signature .signature-space {
+            display: block;
+            min-height: 13mm;
+            border-bottom: 1.4px dashed #111;
+            outline: none;
+        }
+
+        .no-mortuary-signature .signature-name {
             display: block;
             padding-top: 2mm;
+            font-weight: 900;
+            outline: none;
+        }
+
+        .no-mortuary-signature .signature-id {
+            display: flex;
+            gap: 3mm;
+            align-items: baseline;
+            margin-top: 1mm;
+            font-weight: 900;
+        }
+
+        .no-mortuary-signature .signature-id .editable-line {
+            min-width: 30mm;
+            font-weight: 500;
         }
 
         .brand-row {
@@ -730,7 +808,7 @@
     </div>
 
     <main class="page {{ $isApplication ? 'pdf-template' : '' }} {{ $isBdh ? 'bdh-template' : '' }}">
-        @unless ($isApplication || $isSignatureRegister || $isBdh)
+        @unless ($isApplication || $isSignatureRegister || $isBdh || $isNoMortuaryFund)
             <div class="watermark"></div>
             <div class="brand-row">
                 <img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
@@ -906,30 +984,54 @@
             </section>
         @elseif ($isNoMortuaryFund)
             <section class="no-mortuary-document" aria-label="Declaracion sin fondo mortuorio editable">
-                <h1>DECLARACIÓN DE NO AFILIACIÓN AL FONDO MORTUORIO</h1>
+                <header class="no-mortuary-header">
+                    <img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
+                    <div class="no-mortuary-account">
+                        <span>CUENTA N°:</span>
+                        <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $accountNumber }}</span>
+                    </div>
+                </header>
 
-                <p>
-                    Yo,
-                    <span class="editable-line" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>,
-                    portador(a) de la cédula de identidad N°
-                    <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $identification ?: ' ' }}</span>,
-                    declaro de manera libre y voluntaria que no deseo afiliarme ni ser beneficiario(a) del servicio de Fondo Mortuorio ofrecido por la Cooperativa de Ahorro y Crédito Las Naves.
+                <div class="no-mortuary-title">ACUERDO</div>
+
+                <p class="no-mortuary-intro">
+                    <span>Yo,</span>
+                    <span class="editable-line" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>
+                    <span>certifico que tengo pleno conocimiento de que no soy</span>
                 </p>
+                <p>beneficiario del SERVICIO DE FONDO MORTUORIO, por las razones señaladas a continuación:</p>
 
-                <p>
-                    Manifiesto que he recibido información sobre este servicio y acepto que mi decisión quede registrada dentro del expediente de apertura de cuenta.
-                </p>
+                <div class="no-mortuary-reasons">
+                    <div class="no-mortuary-reason">
+                        <span class="no-mortuary-check" contenteditable="true" spellcheck="false">( &nbsp; )</span>
+                        <span>a. Por superar los 65 años de edad al momento de aperturar la cuenta.</span>
+                    </div>
+                    <div class="no-mortuary-reason">
+                        <span class="no-mortuary-check" contenteditable="true" spellcheck="false">( &nbsp; )</span>
+                        <span>b. No deseo acceder al servicio de Fondo Mortuorio, a pesar de haber sido informado(a) de los beneficios.</span>
+                    </div>
+                    <div class="no-mortuary-reason">
+                        <span class="no-mortuary-check" contenteditable="true" spellcheck="false">( &nbsp; )</span>
+                        <span>c. Por contar con un seguro de vida en otra entidad.</span>
+                    </div>
+                    <div class="no-mortuary-reason">
+                        <span class="no-mortuary-check" contenteditable="true" spellcheck="false">( &nbsp; )</span>
+                        <span>d. Otros <span class="editable-line short" contenteditable="true" spellcheck="false"></span></span>
+                    </div>
+                </div>
 
-                <p>
-                    Lugar:
-                    <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $city ?: 'Las Naves' }}</span>
-                    Fecha:
-                    <span class="editable-line" contenteditable="true" spellcheck="false">{{ $day }} de {{ $month }} del {{ $year }}</span>
+                <p class="no-mortuary-date">
+                    <span>Lugar y Fecha : {{ $city ?: 'Las Naves' }},</span>
+                    <span class="editable-line" contenteditable="true" spellcheck="false">{{ $day }} de {{ $month }} de {{ $year }}</span>
                 </p>
 
                 <div class="no-mortuary-signature">
-                    <span contenteditable="true" spellcheck="false"></span>
-                    <strong>Firma del socio</strong>
+                    <span class="signature-space" contenteditable="true" spellcheck="false"></span>
+                    <span class="signature-name" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>
+                    <span class="signature-id">
+                        C.I.:
+                        <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $identification ?: ' ' }}</span>
+                    </span>
                 </div>
             </section>
         @else

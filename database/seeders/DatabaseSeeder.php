@@ -222,7 +222,7 @@ class DatabaseSeeder extends Seeder
         $isLegal = $accountType->slug === 'cuenta-juridica';
         $solicitudPath = 'formatos/1-solicitud-de-ingreso.pdf';
 
-        if ($accountType->slug === 'cuenta-basica') {
+        if (in_array($accountType->slug, ['cuenta-basica', 'cuenta-ahorro-programado'], true)) {
             $items = [
                 ['Formulario solicitud apertura de cuenta', null, 'Formulario solicitud apertura cuenta_{expediente}', true, 'sistema'],
                 ['Formulario conozca a su cliente / socio', null, 'Formulario conozca cliente socio_{expediente}', true, 'sistema'],
@@ -230,8 +230,11 @@ class DatabaseSeeder extends Seeder
                 ['Contrato de apertura de cuenta de ahorros', null, 'Contrato apertura cuenta ahorros_{expediente}', true, 'sistema'],
                 ['Formulario autocertificacion residencia fiscal', null, 'Formulario autocertificacion residencia fiscal_{expediente}', true, 'sistema'],
                 ['Registro de firmas', 'formatos/REGISTRO_DE_FIRMAS.pdf', '7. Registro de firmas_{expediente}', true, 'manual'],
-                ['Autorizacion para acreditacion del BDH', 'formatos/BDH.pdf', 'Autorizacion acreditacion BDH_{expediente}', false, 'manual'],
             ];
+
+            if ($accountType->slug === 'cuenta-basica') {
+                $items[] = ['Autorizacion para acreditacion del BDH', 'formatos/BDH.pdf', 'Autorizacion acreditacion BDH_{expediente}', false, 'manual'];
+            }
         } elseif ($isLegal) {
             $items = [
                 ['Solicitud de ingreso al consejo de administracion', $solicitudPath, 'Solicitud ingreso consejo administracion_{expediente}', true, 'manual'],

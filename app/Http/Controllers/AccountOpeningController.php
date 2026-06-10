@@ -447,18 +447,29 @@ class AccountOpeningController extends Controller
                 ->withErrors('Complete los documentos internos antes de registrar servicios adicionales.');
         }
 
-        $data = $request->validate([
+        $allowsDebitCard = $this->allowsDebitCard($opening);
+        $rules = [
             'fondo_mortuorio' => ['required', Rule::in(['si', 'no'])],
-            'services' => ['nullable', 'array'],
-            'services.*' => ['exists:additional_services,id'],
-        ]);
+        ];
 
-        DB::transaction(function () use ($opening, $data) {
+        if ($allowsDebitCard) {
+            $rules['tarjeta_debito'] = ['required', Rule::in(['si', 'no'])];
+        }
+
+        $data = $request->validate($rules);
+        $data['tarjeta_debito'] = $allowsDebitCard ? $data['tarjeta_debito'] : 'no';
+
+        DB::transaction(function () use ($opening, $data, $allowsDebitCard) {
             SelectedAdditionalService::where('account_opening_id', $opening->id)->delete();
             $fondoId = AdditionalService::where('slug', 'fondo-mortuorio')->value('id');
-            $serviceIds = collect($data['services'] ?? [])->reject(fn ($id) => (int) $id === (int) $fondoId);
+            $tarjetaId = AdditionalService::where('slug', 'tarjeta-de-debito')->value('id');
+            $serviceIds = collect();
+
             if ($data['fondo_mortuorio'] === 'si') {
                 $serviceIds->push($fondoId);
+            }
+            if ($allowsDebitCard && $data['tarjeta_debito'] === 'si') {
+                $serviceIds->push($tarjetaId);
             }
 
             foreach ($serviceIds->filter()->unique() as $serviceId) {
@@ -474,7 +485,10 @@ class AccountOpeningController extends Controller
             $opening,
             'seleccionar_servicios',
             'Servicios adicionales actualizados.',
-            ['fondo_mortuorio' => $data['fondo_mortuorio']]
+            [
+                'fondo_mortuorio' => $data['fondo_mortuorio'],
+                'tarjeta_debito' => $data['tarjeta_debito'],
+            ]
         );
 
         return redirect()
@@ -1174,12 +1188,20 @@ class AccountOpeningController extends Controller
             ->first()?->metadata, 'fondo_mortuorio');
     }
 
+    private function allowsDebitCard(AccountOpening $opening): bool
+    {
+        $opening->loadMissing('accountType');
+
+        return $opening->accountType->slug !== 'cuenta-junior';
+    }
+
     private function requiredServiceTemplateSlugs(AccountOpening $opening)
     {
         $selectedSlugs = $opening->services()
             ->join('additional_services', 'additional_services.id', '=', 'selected_additional_services.additional_service_id')
             ->pluck('additional_services.slug')
-            ->reject(fn ($slug) => $slug === 'fondo-mortuorio');
+            ->reject(fn ($slug) => $slug === 'fondo-mortuorio'
+                || (!$this->allowsDebitCard($opening) && $slug === 'tarjeta-de-debito'));
 
         $templateSlugs = $selectedSlugs
             ->map(fn ($slug) => $this->serviceDocumentMap()[$slug] ?? null)
@@ -1212,13 +1234,7 @@ class AccountOpeningController extends Controller
             return true;
         }
 
-        $requiredIds = $this->serviceDocumentTemplates()
-            ->whereIn('slug', $templateSlugs)
-            ->where(function ($query) {
-                $query->whereNotNull('template_path')
-                    ->orWhere('slug', '!=', 'formulario-servicio-fondo-mortuorio');
-            })
-            ->pluck('id');
+        $requiredIds = $this->serviceDocumentTemplates()->whereIn('slug', $templateSlugs)->pluck('id');
         $loadedIds = $opening->documents()
             ->where('document_scope', 'servicio')
             ->whereIn('status', ['cargado', 'validado'])

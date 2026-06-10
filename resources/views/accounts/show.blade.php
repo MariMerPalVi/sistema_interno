@@ -23,15 +23,22 @@
     $internalComplete = $requiredInternalIds->diff($loadedInternalIds)->isEmpty();
     $servicesComplete = $opening->histories->contains('action', 'seleccionar_servicios');
     $serviceTemplatesBySlug = $serviceTemplates->keyBy('slug');
-    $selectedServiceModels = $services->whereIn('id', $selectedServices);
+    $allowsDebitCard = $opening->accountType->slug !== 'cuenta-junior';
+    $selectedServiceModels = $services->whereIn('id', $selectedServices)
+        ->when(!$allowsDebitCard, fn ($selected) => $selected->reject(fn ($service) => $service->slug === 'tarjeta-de-debito'));
     $fondoDecision = data_get(
         $opening->histories->where('action', 'seleccionar_servicios')->sortByDesc('id')->first()?->metadata,
         'fondo_mortuorio'
     );
+    $tarjetaDecision = data_get(
+        $opening->histories->where('action', 'seleccionar_servicios')->sortByDesc('id')->first()?->metadata,
+        'tarjeta_debito'
+    );
     $selectedServiceTemplateSlugs = $selectedServiceModels
         ->reject(fn ($service) => $service->slug === 'fondo-mortuorio')
         ->map(fn ($service) => $serviceTemplatesBySlug->get($serviceDocumentMap[$service->slug] ?? null)?->id)
-        ->filter();
+        ->filter()
+        ->toBase();
     if ($fondoDecision === 'si') {
         $selectedServiceTemplateSlugs->push($serviceTemplatesBySlug->get('formulario-servicio-fondo-mortuorio')?->id);
     } elseif ($fondoDecision === 'no') {
@@ -39,9 +46,7 @@
     }
     $selectedServiceTemplateIds = $selectedServiceTemplateSlugs->filter()->unique()->values();
     $selectedServiceDocumentTemplates = $serviceTemplates->whereIn('id', $selectedServiceTemplateIds);
-    $availableRequiredServiceTemplateIds = $selectedServiceDocumentTemplates
-        ->reject(fn ($template) => $template->slug === 'formulario-servicio-fondo-mortuorio' && !$template->template_path)
-        ->pluck('id');
+    $availableRequiredServiceTemplateIds = $selectedServiceDocumentTemplates->pluck('id');
     $loadedServiceIds = $opening->documents->where('document_scope', 'servicio')->whereIn('status', ['cargado', 'validado'])->pluck('internal_document_template_id');
     $serviceDocsComplete = $servicesComplete && $availableRequiredServiceTemplateIds->diff($loadedServiceIds)->isEmpty();
     $steps = [
@@ -61,6 +66,7 @@
 @endphp
 
 @section('content')
+    @unless ($activeStep === 'resumen')
     <section class="page-head">
         <div>
             <p class="eyebrow">{{ $opening->public_code }}</p>
@@ -87,6 +93,7 @@
             @endif
         @endforeach
     </nav>
+    @endunless
 
     @if ($activeStep === 'consentimiento')
     <section id="consentimiento" class="panel">
@@ -314,12 +321,13 @@
                     <label><input type="radio" name="fondo_mortuorio" value="si" @checked($fondoDecision === 'si') required> Sí</label>
                     <label><input type="radio" name="fondo_mortuorio" value="no" @checked($fondoDecision === 'no') required> No</label>
                 </fieldset>
-                @foreach ($services->reject(fn ($service) => $service->slug === 'fondo-mortuorio') as $service)
-                    <label class="service-option">
-                        <input type="checkbox" name="services[]" value="{{ $service->id }}" @checked(in_array($service->id, $selectedServices))>
-                        <span>{{ $service->name }}</span>
-                    </label>
-                @endforeach
+                @if ($allowsDebitCard)
+                    <fieldset class="service-option service-decision">
+                        <legend>Tarjeta de débito</legend>
+                        <label><input type="radio" name="tarjeta_debito" value="si" @checked($tarjetaDecision === 'si') required> Sí</label>
+                        <label><input type="radio" name="tarjeta_debito" value="no" @checked($tarjetaDecision === 'no') required> No</label>
+                    </fieldset>
+                @endif
             </div>
             <div class="actions">
                 <button class="button primary" type="submit">Guardar servicios</button>
@@ -335,8 +343,8 @@
                     <article class="check-item">
                         <div>
                             <h3>{{ $template->name }}</h3>
-                            @if ($template->slug === 'formulario-servicio-fondo-mortuorio' && !$template->template_path)
-                                <span class="hint">Formato pendiente de incorporar.</span>
+                            @if (!$template->template_path)
+                                <span class="hint">Documento pendiente de definir. Debe cargarse cuando sea generado desde Econx.</span>
                             @elseif ($template->template_path)
                                 <div class="doc-actions">
                                     <a href="{{ route('accounts.services.documents.generate', [$opening, $template]) }}" target="_blank">Abrir documento editable</a>
@@ -348,20 +356,18 @@
                             <p class="hint">Se guardara como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>
                             @include('partials.badge', ['status' => $doc->status ?? 'pendiente'])
                         </div>
-                        @if ($template->template_path || $template->slug !== 'formulario-servicio-fondo-mortuorio')
-                            <form method="post" enctype="multipart/form-data" action="{{ route('accounts.services.documents.upload', $opening) }}">
-                                @csrf
-                                <input type="hidden" name="internal_document_template_id" value="{{ $template->id }}">
-                                <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required>
-                                <label class="check"><input type="checkbox" name="manual_signature_confirmed" value="1" required> Firma validada</label>
-                                <select name="status">
-                                    <option value="cargado">Cargado</option>
-                                    <option value="validado">Validado</option>
-                                    <option value="rechazado">Rechazado</option>
-                                </select>
-                                <button class="button secondary" type="submit">{{ $doc ? 'Reemplazar' : 'Subir' }}</button>
-                            </form>
-                        @endif
+                        <form method="post" enctype="multipart/form-data" action="{{ route('accounts.services.documents.upload', $opening) }}">
+                            @csrf
+                            <input type="hidden" name="internal_document_template_id" value="{{ $template->id }}">
+                            <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required>
+                            <label class="check"><input type="checkbox" name="manual_signature_confirmed" value="1" required> Firma validada</label>
+                            <select name="status">
+                                <option value="cargado">Cargado</option>
+                                <option value="validado">Validado</option>
+                                <option value="rechazado">Rechazado</option>
+                            </select>
+                            <button class="button secondary" type="submit">{{ $doc ? 'Reemplazar' : 'Subir' }}</button>
+                        </form>
                     </article>
                 @endforeach
             </div>
@@ -375,26 +381,12 @@
     @endif
 
     @if ($activeStep === 'resumen')
-    <section id="resumen" class="panel">
-        <div class="panel-head">
-            <h2>Check List del expediente</h2>
-            <span class="hint">{{ $progress }}% completado</span>
+    <section id="resumen" class="checklist-only">
+        <div class="checklist-actions">
+            <a class="button ghost" href="{{ route('accounts.show', [$opening, 'paso' => 'servicios']) }}">Regresar</a>
+            <a class="button secondary" href="{{ route('processes.index') }}">Cerrar</a>
+            <button class="button primary" type="button" onclick="window.print()">Guardar expediente</button>
         </div>
-        <div class="summary-grid">
-            <div><strong>Tipo de cuenta</strong><span>{{ $opening->accountType->name }}</span></div>
-            <div><strong>Socio</strong><span>{{ trim($opening->member_first_names.' '.$opening->member_last_names) ?: 'Pendiente' }}</span></div>
-            <div><strong>Documentos cargados</strong><span>{{ $opening->documents->count() }}</span></div>
-            <div><strong>Evidencia de consultas</strong><span>{{ $opening->externalEvidences->whereNotNull('screenshot_path')->count() ? 'Cargada' : 'Pendiente' }}</span></div>
-            <div><strong>Servicios</strong><span>{{ count($selectedServices) }}</span></div>
-            <div><strong>Estado</strong><span>{{ str_replace('_', ' ', $opening->status) }}</span></div>
-            <div><strong>Revision digital</strong><span>{{ $opening->ai_review_status ? str_replace('_', ' ', $opening->ai_review_status).' ('.$opening->ai_review_score.'%)' : 'Pendiente' }}</span></div>
-        </div>
-        <div class="checklist-storage">
-            <strong>Carpeta del expediente</strong>
-            <code>{{ $expedientStoragePath }}</code>
-            <button class="button secondary" type="button" onclick="window.print()">Guardar / imprimir Check List</button>
-        </div>
-
         <div class="official-check-wrap">
             <table class="official-checklist">
                 <tbody>
@@ -512,20 +504,6 @@
                 </tbody>
             </table>
         </div>
-        <form method="post" action="{{ route('accounts.submit', $opening) }}">
-            @csrf
-            <button class="button primary" type="submit">{{ $opening->ai_review_status ? 'Ejecutar revision digital nuevamente' : 'Ejecutar revision digital' }}</button>
-        </form>
-        <h3>Historial de acciones</h3>
-        <ol class="timeline">
-            @foreach ($opening->histories->sortByDesc('created_at') as $history)
-                <li>
-                    <strong>{{ $history->action }}</strong>
-                    <span>{{ $history->description }}</span>
-                    <small>{{ $history->created_at?->format('d/m/Y H:i') }}</small>
-                </li>
-            @endforeach
-        </ol>
     </section>
     @endif
 @endsection

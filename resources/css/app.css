@@ -923,6 +923,21 @@ pre {
   background: #fff;
 }
 
+.checklist-only {
+  width: 100%;
+}
+
+.checklist-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.checklist-only .official-check-wrap {
+  margin: 0;
+}
+
 .official-checklist {
   width: 100%;
   min-width: 980px;
@@ -1017,6 +1032,7 @@ pre {
   .progress,
   .summary-grid,
   .checklist-storage,
+  .checklist-actions,
   #resumen > form,
   #resumen > h3:not(:first-of-type),
   .timeline {
