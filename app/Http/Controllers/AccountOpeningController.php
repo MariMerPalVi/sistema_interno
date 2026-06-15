@@ -85,6 +85,8 @@ class AccountOpeningController extends Controller
             'serviceTemplates' => $this->serviceDocumentTemplates()->get(),
             'services' => AdditionalService::where('active', true)->orderBy('name')->get(),
             'serviceDocumentMap' => $this->serviceDocumentMap(),
+            'externalSubjects' => $this->externalCheckSubjects($opening),
+            'companyExternalCheckApplicable' => $this->companyExternalCheckApplicable($opening),
             'consentDefaults' => $this->consentDocumentDefaults($opening),
             'documentDefaults' => $this->documentDownloadDefaults($opening),
             'progress' => $this->calculateProgress($opening),
@@ -147,6 +149,30 @@ class AccountOpeningController extends Controller
         return redirect()
             ->route('accounts.show', [$opening, 'paso' => 'requisitos'])
             ->with('success', 'Condicion de conyuge actualizada.');
+    }
+
+    public function updateOptionalRequirements(Request $request, AccountOpening $opening)
+    {
+        $allowedIds = $opening->accountType->requirements()
+            ->where('is_required', false)
+            ->whereHas('type', fn ($query) => $query->where('slug', '!=', 'documentos-conyuge'))
+            ->pluck('id');
+
+        $selectedIds = collect($request->input('optional_requirements', []))
+            ->map(fn ($id) => (int) $id)
+            ->intersect($allowedIds)
+            ->values();
+
+        $this->audit(
+            $opening,
+            'seleccionar_requisitos_opcionales',
+            'Requisitos opcionales actualizados.',
+            ['requirement_ids' => $selectedIds->all()]
+        );
+
+        return redirect()
+            ->route('accounts.show', [$opening, 'paso' => 'requisitos'])
+            ->with('success', 'Requisitos opcionales actualizados.');
     }
 
     public function uploadConsent(Request $request, AccountOpening $opening)
@@ -258,11 +284,15 @@ class AccountOpeningController extends Controller
     {
         $data = $request->validate([
             'evidence_images' => ['nullable', 'array'],
-            'evidence_images.*' => ['nullable', 'string'],
+            'evidence_images.*' => ['nullable', 'array'],
+            'evidence_images.*.*' => ['nullable', 'string'],
             'results' => ['required', 'array'],
-            'results.*' => [Rule::in(['sin_novedad', 'con_observacion', 'no_aplica', 'pendiente'])],
+            'results.*' => ['required', 'array'],
+            'results.*.*' => [Rule::in(['sin_novedad', 'con_observacion', 'no_aplica', 'pendiente'])],
             'observations' => ['nullable', 'array'],
-            'observations.*' => ['nullable', 'string', 'max:500'],
+            'observations.*' => ['nullable', 'array'],
+            'observations.*.*' => ['nullable', 'string', 'max:500'],
+            'company_check_applicable' => ['nullable', 'boolean'],
         ]);
 
         if (!$this->requiredDocumentsAreValid($opening)) {
@@ -272,49 +302,69 @@ class AccountOpeningController extends Controller
         }
 
         $items = ExternalCheckItem::where('active', true)->orderBy('sort_order')->get();
-        $existingPath = $opening->externalEvidences()->whereNotNull('screenshot_path')->value('screenshot_path');
-        $postedImages = collect($data['evidence_images'] ?? [])->filter(fn ($value) => filled($value));
-        $mustGeneratePdf = !$existingPath || $postedImages->isNotEmpty();
+        $companyApplicable = $request->boolean('company_check_applicable');
+        $subjects = $this->externalCheckSubjects($opening, $companyApplicable);
 
-        if ($mustGeneratePdf) {
-            $missing = $items
-                ->filter(fn ($item) => blank($data['evidence_images'][$item->id] ?? null))
-                ->pluck('name');
+        foreach ($subjects as $subjectKey => $subjectLabel) {
+            $existingPath = $opening->externalEvidences()
+                ->where('subject_key', $subjectKey)
+                ->whereNotNull('screenshot_path')
+                ->value('screenshot_path');
+            $subjectImages = $data['evidence_images'][$subjectKey] ?? [];
+            $postedImages = collect($subjectImages)->filter(fn ($value) => filled($value));
+            $mustGeneratePdf = !$existingPath || $postedImages->isNotEmpty();
 
-            if ($missing->isNotEmpty()) {
+            if ($mustGeneratePdf) {
+                $missing = $items
+                    ->filter(fn ($item) => blank($subjectImages[$item->id] ?? null))
+                    ->pluck('name');
+
+                if ($missing->isNotEmpty()) {
+                    return redirect()
+                        ->route('accounts.show', [$opening, 'paso' => 'externas'])
+                        ->withErrors("Pegue todas las evidencias de {$subjectLabel}. Faltan: ".$missing->implode(', ').'.');
+                }
+            }
+
+            $path = $mustGeneratePdf
+                ? $this->storePastedImagesAsPdf(
+                    $items,
+                    $subjectImages,
+                    $opening,
+                    "Revision listas de control {$subjectLabel}_{expediente}"
+                )
+                : $existingPath;
+
+            if (!$path) {
                 return redirect()
                     ->route('accounts.show', [$opening, 'paso' => 'externas'])
-                    ->withErrors('Pegue la evidencia de: '.$missing->implode(', ').'.');
+                    ->withErrors("Complete las evidencias de {$subjectLabel} antes de continuar.");
+            }
+
+            foreach ($items as $item) {
+                ExternalCheckEvidence::updateOrCreate(
+                    [
+                        'account_opening_id' => $opening->id,
+                        'external_check_item_id' => $item->id,
+                        'subject_key' => $subjectKey,
+                    ],
+                    [
+                        'result' => $data['results'][$subjectKey][$item->id] ?? 'pendiente',
+                        'screenshot_path' => $path,
+                        'advisor_observation' => $data['observations'][$subjectKey][$item->id] ?? null,
+                        'uploaded_by' => null,
+                        'uploaded_at' => now(),
+                    ]
+                );
             }
         }
 
-        $path = $mustGeneratePdf
-            ? $this->storePastedImagesAsPdf($items, $data['evidence_images'] ?? [], $opening, 'Revision listas de control_{expediente}')
-            : $existingPath;
-
-        if (!$path) {
-            return redirect()
-                ->route('accounts.show', [$opening, 'paso' => 'externas'])
-                ->withErrors('Pegue una evidencia para cada linea de control antes de continuar.');
-        }
-
-        foreach ($items as $item) {
-            ExternalCheckEvidence::updateOrCreate(
-                [
-                    'account_opening_id' => $opening->id,
-                    'external_check_item_id' => $item->id,
-                ],
-                [
-                    'result' => $data['results'][$item->id] ?? 'pendiente',
-                    'screenshot_path' => $path,
-                    'advisor_observation' => $data['observations'][$item->id] ?? null,
-                    'uploaded_by' => null,
-                    'uploaded_at' => now(),
-                ]
-            );
-        }
-
-        $this->audit($opening, 'cargar_evidencia_externa', 'Evidencia de consulta externa registrada.');
+        $this->audit(
+            $opening,
+            'cargar_evidencia_externa',
+            'Evidencias de consulta externa registradas.',
+            ['company_check_applicable' => $companyApplicable]
+        );
 
         $nextStep = $this->externalChecksAreComplete($opening) ? 'internos' : 'externas';
 
@@ -447,29 +497,17 @@ class AccountOpeningController extends Controller
                 ->withErrors('Complete los documentos internos antes de registrar servicios adicionales.');
         }
 
-        $allowsDebitCard = $this->allowsDebitCard($opening);
-        $rules = [
+        $data = $request->validate([
             'fondo_mortuorio' => ['required', Rule::in(['si', 'no'])],
-        ];
+        ]);
 
-        if ($allowsDebitCard) {
-            $rules['tarjeta_debito'] = ['required', Rule::in(['si', 'no'])];
-        }
-
-        $data = $request->validate($rules);
-        $data['tarjeta_debito'] = $allowsDebitCard ? $data['tarjeta_debito'] : 'no';
-
-        DB::transaction(function () use ($opening, $data, $allowsDebitCard) {
+        DB::transaction(function () use ($opening, $data) {
             SelectedAdditionalService::where('account_opening_id', $opening->id)->delete();
             $fondoId = AdditionalService::where('slug', 'fondo-mortuorio')->value('id');
-            $tarjetaId = AdditionalService::where('slug', 'tarjeta-de-debito')->value('id');
             $serviceIds = collect();
 
             if ($data['fondo_mortuorio'] === 'si') {
                 $serviceIds->push($fondoId);
-            }
-            if ($allowsDebitCard && $data['tarjeta_debito'] === 'si') {
-                $serviceIds->push($tarjetaId);
             }
 
             foreach ($serviceIds->filter()->unique() as $serviceId) {
@@ -485,10 +523,7 @@ class AccountOpeningController extends Controller
             $opening,
             'seleccionar_servicios',
             'Servicios adicionales actualizados.',
-            [
-                'fondo_mortuorio' => $data['fondo_mortuorio'],
-                'tarjeta_debito' => $data['tarjeta_debito'],
-            ]
+            ['fondo_mortuorio' => $data['fondo_mortuorio']]
         );
 
         return redirect()
@@ -761,7 +796,9 @@ class AccountOpeningController extends Controller
 
         $memberName = $this->singleLine(trim(($opening->member_first_names ?? '').' '.($opening->member_last_names ?? '')));
         $extractedName = $this->singleLine($cedulaData['nombres_apellidos'] ?? '');
-        $fullName = mb_strlen($extractedName) > mb_strlen($memberName) ? $extractedName : $memberName;
+        $fullName = $this->isPlausiblePersonName($extractedName)
+            ? $extractedName
+            : ($this->isPlausiblePersonName($memberName) ? $memberName : '');
 
         return [
             'apellidos_nombres' => $fullName,
@@ -819,12 +856,15 @@ class AccountOpeningController extends Controller
         $updates = [];
 
         if (in_array($slug, ['cedula', 'cedula-papeleta'], true)) {
-            if (blank($opening->member_identification) && filled($extracted['cedula'] ?? null)) {
-                $updates['member_identification'] = $extracted['cedula'];
+            $identification = preg_replace('/\D+/', '', (string) ($extracted['cedula'] ?? ''));
+            if (strlen($identification) === 10) {
+                $updates['member_identification'] = $identification;
             }
 
-            if (blank($opening->member_first_names) && blank($opening->member_last_names) && filled($extracted['nombres_apellidos'] ?? null)) {
-                $updates['member_first_names'] = $extracted['nombres_apellidos'];
+            $fullName = $this->singleLine($extracted['nombres_apellidos'] ?? '');
+            if ($this->isPlausiblePersonName($fullName)) {
+                $updates['member_first_names'] = $fullName;
+                $updates['member_last_names'] = null;
             }
 
             if (blank($opening->member_nationality) && filled($extracted['nacionalidad'] ?? null)) {
@@ -880,6 +920,22 @@ class AccountOpeningController extends Controller
         $value = trim((string) $value);
 
         return preg_replace('/\s+/u', ' ', $value) ?? $value;
+    }
+
+    private function isPlausiblePersonName(?string $name): bool
+    {
+        $name = mb_strtoupper($this->singleLine($name), 'UTF-8');
+        if ($name === '' || mb_strlen($name) < 7 || preg_match('/\d/u', $name)) {
+            return false;
+        }
+
+        foreach (['CEDULA', 'CÉDULA', 'IDENTIDAD', 'APELLIDOS', 'NOMBRES', 'NOMBRE', 'NACIONALIDAD', 'CERTIFICADO', 'VOTACION', 'VOTACIÓN', 'CONYUGE', 'CÓNYUGE', 'REPRESENTANTE'] as $word) {
+            if (preg_match('/\b'.preg_quote($word, '/').'\b/u', $name)) {
+                return false;
+            }
+        }
+
+        return count(array_filter(explode(' ', $name), fn (string $part) => mb_strlen($part) >= 2)) >= 2;
     }
 
     private function makePdfFromJpeg(string $jpeg): string
@@ -1130,6 +1186,8 @@ class AccountOpeningController extends Controller
             $requiredIds = $requiredIds->merge($spouseIds)->unique();
         }
 
+        $requiredIds = $requiredIds->merge($this->selectedOptionalRequirementIds($opening))->unique();
+
         $validIds = $opening->documents()
             ->where('document_scope', 'requisito')
             ->whereIn('status', ['cargado', 'validado'])
@@ -1138,12 +1196,74 @@ class AccountOpeningController extends Controller
         return $requiredIds->diff($validIds)->isEmpty();
     }
 
+    private function selectedOptionalRequirementIds(AccountOpening $opening)
+    {
+        $allowedIds = $opening->accountType->requirements()
+            ->where('is_required', false)
+            ->whereHas('type', fn ($query) => $query->where('slug', '!=', 'documentos-conyuge'))
+            ->pluck('id');
+
+        $selectionHistory = $opening->histories()
+            ->where('action', 'seleccionar_requisitos_opcionales')
+            ->latest('id')
+            ->first();
+
+        $selectedIds = collect(data_get($selectionHistory?->metadata, 'requirement_ids', []));
+
+        $uploadedOptionalIds = $opening->documents()
+            ->where('document_scope', 'requisito')
+            ->whereIn('account_type_requirement_id', $allowedIds)
+            ->pluck('account_type_requirement_id');
+
+        return ($selectionHistory ? $selectedIds : $selectedIds->merge($uploadedOptionalIds))
+            ->map(fn ($id) => (int) $id)
+            ->intersect($allowedIds)
+            ->unique()
+            ->values();
+    }
+
     private function externalChecksAreComplete(AccountOpening $opening): bool
     {
         $requiredIds = ExternalCheckItem::where('active', true)->where('is_required', true)->pluck('id');
-        $loadedIds = $opening->externalEvidences()->whereNotNull('screenshot_path')->pluck('external_check_item_id');
+        $loaded = $opening->externalEvidences()->whereNotNull('screenshot_path')->get();
 
-        return $requiredIds->diff($loadedIds)->isEmpty();
+        foreach (array_keys($this->externalCheckSubjects($opening)) as $subjectKey) {
+            $loadedIds = $loaded->where('subject_key', $subjectKey)->pluck('external_check_item_id');
+            if ($requiredIds->diff($loadedIds)->isNotEmpty()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function companyExternalCheckApplicable(AccountOpening $opening): bool
+    {
+        return (bool) data_get(
+            $opening->histories()
+                ->where('action', 'cargar_evidencia_externa')
+                ->latest('id')
+                ->first()?->metadata,
+            'company_check_applicable',
+            false
+        );
+    }
+
+    private function externalCheckSubjects(AccountOpening $opening, ?bool $companyApplicable = null): array
+    {
+        $opening->loadMissing('accountType');
+
+        return match ($opening->accountType->slug) {
+            'cuenta-junior' => [
+                'representante' => 'Representante',
+                'menor' => 'Menor',
+            ],
+            'cuenta-juridica' => array_filter([
+                'representante_legal' => 'Representante legal',
+                'empresa' => ($companyApplicable ?? $this->companyExternalCheckApplicable($opening)) ? 'Empresa' : null,
+            ]),
+            default => ['titular' => 'Titular'],
+        };
     }
 
     private function internalDocumentsAreComplete(AccountOpening $opening): bool
@@ -1176,7 +1296,6 @@ class AccountOpeningController extends Controller
     {
         return [
             'fondo-mortuorio' => 'formulario-servicio-fondo-mortuorio',
-            'tarjeta-de-debito' => 'solicitud-tarjeta-de-debito',
         ];
     }
 
@@ -1188,24 +1307,9 @@ class AccountOpeningController extends Controller
             ->first()?->metadata, 'fondo_mortuorio');
     }
 
-    private function allowsDebitCard(AccountOpening $opening): bool
-    {
-        $opening->loadMissing('accountType');
-
-        return $opening->accountType->slug !== 'cuenta-junior';
-    }
-
     private function requiredServiceTemplateSlugs(AccountOpening $opening)
     {
-        $selectedSlugs = $opening->services()
-            ->join('additional_services', 'additional_services.id', '=', 'selected_additional_services.additional_service_id')
-            ->pluck('additional_services.slug')
-            ->reject(fn ($slug) => $slug === 'fondo-mortuorio'
-                || (!$this->allowsDebitCard($opening) && $slug === 'tarjeta-de-debito'));
-
-        $templateSlugs = $selectedSlugs
-            ->map(fn ($slug) => $this->serviceDocumentMap()[$slug] ?? null)
-            ->filter();
+        $templateSlugs = collect();
 
         $decision = $this->fondoMortuorioDecision($opening);
         if ($decision === 'si') {

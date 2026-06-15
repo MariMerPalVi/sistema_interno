@@ -2,11 +2,18 @@
     $slug = $template->slug;
     $isSignatureRegister = str_contains($slug, 'registro-de-firmas');
     $isApplication = str_contains($slug, 'solicitud-de-ingreso');
+    $isJuniorApplication = $isApplication && $opening->accountType->slug === 'cuenta-junior';
+    $isLegalApplication = $isApplication && $opening->accountType->slug === 'cuenta-juridica';
     $isBdh = str_contains($slug, 'bdh') || str_contains($slug, 'acreditacion') || str_contains($slug, 'reapertura') || str_contains($slug, 'cierre');
+    $isMortuaryFund = str_contains($slug, 'formulario-servicio-fondo-mortuorio');
     $isNoMortuaryFund = str_contains($slug, 'sin-fondo-mortuorio');
     $fullName = trim(preg_replace('/\s+/', ' ', $fields['apellidos_nombres'] ?? ''));
     $identification = preg_replace('/\D+/', '', $fields['cedula_identidad'] ?? '');
     $accountNumber = $fields['cuenta_numero'] ?? $opening->file_name;
+    $accountDigits = preg_replace('/\D+/', '', (string) $accountNumber);
+    $mortuaryAccountNumber = strlen($accountDigits) === 12 && str_starts_with($accountDigits, '42010101')
+        ? $accountDigits
+        : '42010101'.str_pad(substr($accountDigits, -4), 4, '0', STR_PAD_LEFT);
     $memberCode = $fields['codigo_socio'] ?? $opening->file_name;
     $accountType = $fields['tipo_cuenta'] ?? $opening->accountType->name;
     $city = $fields['ciudad'] ?? 'Las Naves';
@@ -161,6 +168,71 @@
 
         .application-document .signature span {
             min-width: 54mm;
+            border-top: 1px solid #111;
+            padding-top: 2mm;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .junior-application h1 {
+            margin-bottom: 2mm;
+        }
+
+        .junior-application .subtitle {
+            margin: 0 0 14mm;
+            font-size: 14px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .junior-application .junior-name {
+            min-width: 105mm;
+        }
+
+        .junior-application .junior-id {
+            min-width: 40mm;
+        }
+
+        .junior-application .signature {
+            margin-top: 20mm;
+        }
+
+        .legal-application h1 {
+            margin-bottom: 2mm;
+        }
+
+        .legal-application .subtitle {
+            margin: 0 0 13mm;
+            font-size: 14px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .legal-application .legal-name {
+            min-width: 103mm;
+        }
+
+        .legal-application .legal-company {
+            min-width: 105mm;
+        }
+
+        .legal-application .legal-ruc,
+        .legal-application .legal-id {
+            min-width: 40mm;
+        }
+
+        .legal-application .legal-role {
+            min-width: 48mm;
+        }
+
+        .legal-signatures {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 34mm;
+            margin: 17mm 0 8mm;
+        }
+
+        .legal-signatures span {
             border-top: 1px solid #111;
             padding-top: 2mm;
             font-size: 10px;
@@ -432,11 +504,11 @@
             display: grid;
             grid-template-columns: 1fr auto;
             align-items: end;
-            margin-bottom: 8mm;
+            margin-bottom: 6mm;
         }
 
         .no-mortuary-header img {
-            width: 103mm;
+            width: 76mm;
             height: auto;
         }
 
@@ -479,6 +551,11 @@
 
         .no-mortuary-document .editable-line.short {
             min-width: 28mm;
+        }
+
+        .no-mortuary-document p[style*="text-align:center"] .editable-line.short {
+            min-width: 42mm;
+            text-align: left;
         }
 
         .no-mortuary-document .editable-line:focus,
@@ -550,6 +627,62 @@
         .no-mortuary-signature .signature-id .editable-line {
             min-width: 30mm;
             font-weight: 500;
+        }
+
+        .mortuary-copy {
+            margin-top: 2mm;
+            text-align: justify;
+        }
+
+        .mortuary-health {
+            display: grid;
+            gap: 2mm;
+            margin-top: 3mm;
+        }
+
+        .mortuary-health p {
+            margin: 0;
+        }
+
+        .mortuary-beneficiary {
+            width: 86%;
+            margin-top: 4mm;
+            border-collapse: collapse;
+        }
+
+        .mortuary-beneficiary caption {
+            padding-bottom: 1mm;
+            font-weight: 800;
+            text-align: left;
+        }
+
+        .mortuary-beneficiary td {
+            height: 7mm;
+            padding: 1mm 2mm;
+            border: 1px solid #111;
+        }
+
+        .mortuary-beneficiary td:first-child {
+            width: 34mm;
+            font-weight: 700;
+        }
+
+        .mortuary-signature-row {
+            display: grid;
+            grid-template-columns: 78mm 42mm;
+            align-items: end;
+            gap: 22mm;
+            margin-top: 12mm;
+        }
+
+        .mortuary-signature-row .no-mortuary-signature {
+            width: 72mm;
+            margin: 0;
+        }
+
+        .mortuary-seal {
+            width: 38mm;
+            height: auto;
         }
 
         .brand-row {
@@ -808,7 +941,7 @@
     </div>
 
     <main class="page {{ $isApplication ? 'pdf-template' : '' }} {{ $isBdh ? 'bdh-template' : '' }}">
-        @unless ($isApplication || $isSignatureRegister || $isBdh || $isNoMortuaryFund)
+        @unless ($isApplication || $isSignatureRegister || $isBdh || $isMortuaryFund || $isNoMortuaryFund)
             <div class="watermark"></div>
             <div class="brand-row">
                 <img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
@@ -874,6 +1007,128 @@
                 <tr><td style="height: 18mm;">Observaciones:</td><td>Firma:</td></tr>
                 <tr><td>Jefe de Captaciones</td><td>Fecha</td></tr>
             </table>
+            </section>
+        @elseif ($isLegalApplication)
+            <img class="template-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
+            <section class="template-content application-document legal-application" aria-label="Solicitud de ingreso jurídica editable">
+                <h1>SOLICITUD DE INGRESO</h1>
+                <p class="subtitle">(Jurídicas)</p>
+
+                <p class="letter-date">
+                    <span class="editable medium" contenteditable="true">{{ $city }}</span>,
+                    <span class="editable short" contenteditable="true">{{ $day }}</span>
+                    de <span class="editable medium" contenteditable="true">{{ $month }}</span>
+                    del 202<span class="editable short" contenteditable="true">{{ $yearSuffix }}</span>
+                </p>
+
+                <p>Señores</p>
+                <p><strong>CONSEJO DE ADMINISTRACIÓN DE LA COAC LAS NAVES</strong></p>
+                <p style="margin-bottom: 13mm;">Presente. -</p>
+
+                <p>
+                    Yo, <span class="editable legal-name" contenteditable="true">{{ $fullName }}</span>,
+                    portador de la cédula N.º <span class="editable legal-id" contenteditable="true">{{ $identification }}</span>,
+                    en calidad de Representante legal de
+                    <span class="editable legal-company" contenteditable="true"></span>
+                    con RUC N° <span class="editable legal-ruc" contenteditable="true"></span>,
+                    ante ustedes muy respetuosamente comparezco y solicito.
+                </p>
+
+                <p>
+                    Se sirvan aceptar la presente solicitud de ingreso en calidad de
+                    SOCIO ( <span class="check" contenteditable="true"> </span> )
+                    CLIENTE ( <span class="check" contenteditable="true"> </span> )
+                    a la COAC LAS NAVES, con la condición de
+                    FIRMA INDISTINTA ( <span class="check" contenteditable="true"> </span> )
+                    FIRMA CONJUNTA ( <span class="check" contenteditable="true"> </span> )
+                    con <span class="editable legal-name" contenteditable="true"></span>
+                    cédula N° <span class="editable legal-id" contenteditable="true"></span>
+                    en calidad de <span class="editable legal-role" contenteditable="true"></span>
+                    y/o <span class="editable legal-name" contenteditable="true"></span>
+                    con cédula N° <span class="editable legal-id" contenteditable="true"></span>
+                    en calidad de <span class="editable legal-role" contenteditable="true"></span>;
+                    comprometiéndome a cumplir la Ley Orgánica Económica Popular Solidaria, el Sector Financiero,
+                    el Reglamento de la Presente Ley, los estatutos y demás reglamentos internos de la misma.
+                </p>
+
+                <div class="legal-signatures">
+                    <span>1ER FIRMANTE</span>
+                    <span>2DO FIRMANTE</span>
+                </div>
+
+                <section class="approval-box">
+                    <p>
+                        La presente SOLICITUD DE INGRESO es aprobada por el Gerente, de acuerdo con lo establecido en el Estatuto Social,
+                        Artículo 21, numeral 6 “Aceptar o rechazar las solicitudes de ingreso o retiro de socios, la atribución de aceptar
+                        socios podrá ser delegada a la gerencia o administradores de las oficinas operativas, en los segmentos que la
+                        reglamentación lo permita” y mediante <strong>Resolución N° 2015-22-05</strong> emitida por el Consejo de Administración
+                        el 15 de junio del 2015.
+                    </p>
+                    <div class="manager-signature">
+                        <span>APROBADO POR GERENTE</span>
+                    </div>
+                </section>
+            </section>
+        @elseif ($isJuniorApplication)
+            <img class="template-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
+            <section class="template-content application-document junior-application" aria-label="Solicitud de ingreso de menor editable">
+                <h1>SOLICITUD DE INGRESO</h1>
+                <p class="subtitle">(Menor de Edad)</p>
+
+                <p class="letter-date">
+                    <span class="editable medium" contenteditable="true">{{ $city }}</span>,
+                    <span class="editable short" contenteditable="true">{{ $day }}</span>
+                    de <span class="editable medium" contenteditable="true">{{ $month }}</span>
+                    del 202<span class="editable short" contenteditable="true">{{ $yearSuffix }}</span>
+                </p>
+
+                <p>Señores</p>
+                <p><strong>CONSEJO DE ADMINISTRACIÓN DE LA COAC LAS NAVES</strong></p>
+                <p style="margin-bottom: 16mm;">Presente. -</p>
+
+                <p>
+                    Yo,
+                    <span class="editable junior-name" contenteditable="true">{{ $fullName }}</span>,
+                    portador de la cédula Nº
+                    <span class="editable junior-id" contenteditable="true">{{ $identification }}</span>,
+                    ante ustedes muy respetuosamente comparezco y solicito.
+                </p>
+
+                <p>
+                    Se sirvan aceptar la presente solicitud de ingreso en calidad de cliente de a la COAC LAS NAVES,
+                    al menor de edad
+                    <span class="editable junior-name" contenteditable="true"></span>
+                    con cédula Nº
+                    <span class="editable junior-id" contenteditable="true"></span>,
+                    comprometiéndome a cumplir la Ley Orgánica Económica Popular Solidaria, el Sector Financiero,
+                    el Reglamento de la Presente Ley, los estatutos y demás reglamentos internos de la misma.
+                </p>
+
+                <p>
+                    ( <span class="check" contenteditable="true">{{ $mortuaryFund === 'si' ? 'X' : '' }}</span> )
+                    Solicito ser beneficiario del fondo mortuorio y acogerme a las políticas establecidas por la Institución.
+                </p>
+                <p>
+                    ( <span class="check" contenteditable="true">{{ $mortuaryFund === 'no' ? 'X' : '' }}</span> )
+                    Solicito no ser beneficiario del fondo mortuorio.
+                </p>
+
+                <div class="signature">
+                    <span>REPRESENTANTE</span>
+                </div>
+
+                <section class="approval-box">
+                    <p>
+                        La presente SOLICITUD DE INGRESO es aprobada por el Gerente, de acuerdo con lo establecido en el Estatuto Social,
+                        Artículo 21, numeral 6 “Aceptar o rechazar las solicitudes de ingreso o retiro de socios, la atribución de aceptar
+                        socios podrá ser delegada a la gerencia o administradores de las oficinas operativas, en los segmentos que la
+                        reglamentación lo permita” y mediante <strong>Resolución N° 2015-22-05</strong> emitida por el Consejo de Administración
+                        el 15 de junio del 2015.
+                    </p>
+                    <div class="manager-signature">
+                        <span>APROBADO POR GERENTE</span>
+                    </div>
+                </section>
             </section>
         @elseif ($isApplication)
             <img class="template-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
@@ -982,6 +1237,69 @@
                     <span class="editable" contenteditable="true" spellcheck="false">{{ $identification ?: ' ' }}</span>
                 </div>
             </section>
+        @elseif ($isMortuaryFund)
+            <section class="no-mortuary-document mortuary-document" aria-label="Formulario de fondo mortuorio editable">
+                <header class="no-mortuary-header">
+                    <img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
+                    <div class="no-mortuary-account">
+                        <span>CUENTA N°:</span>
+                        <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $accountNumber }}</span>
+                    </div>
+                </header>
+
+                <div class="no-mortuary-title">AUTORIZACIÓN DE DÉBITO, PARA ACCEDER AL SERVICIO DE FONDO MORTUORIO</div>
+
+                <p class="no-mortuary-intro">
+                    <span>Yo,</span>
+                    <span class="editable-line" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>
+                    <span>autorizo a la Cooperativa de Ahorro y Crédito Las Naves</span>
+                </p>
+                <p class="mortuary-copy">
+                    Ltda., a debitar de mi cuenta de ahorros el valor de USD <strong>10,00 (Diez, 00/100 Dólares)</strong>
+                    anuales, para cubrir mi afiliación al Servicio de Fondo Mortuorio, de acuerdo con las políticas
+                    establecidas por la COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES LTDA.
+                </p>
+
+                <p style="text-align:center;">
+                    <strong>Número de Cuenta:</strong>
+                    <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $mortuaryAccountNumber }}</span>
+                </p>
+
+                <div class="mortuary-health">
+                    <p>Al vencimiento del presente, <span class="editable-line short" contenteditable="true">SÍ _____ NO _____</span> autorizo el débito para la renovación automática de mi suscripción.</p>
+                    <p><strong>Declaración de salud:</strong></p>
+                    <p>a. Al momento de suscribir el presente formulario, ¿se encuentra sano(a) y desempeñando activamente sus labores habituales? <span class="editable-line short" contenteditable="true">SÍ _____ NO _____</span></p>
+                    <p>b. ¿Le ha sido diagnosticada alguna enfermedad en los últimos 6 (seis) meses? <span class="editable-line short" contenteditable="true">SÍ _____ NO _____</span></p>
+                    <p>En caso de ser afirmativo, detalle cuál o cuáles son:</p>
+                    <span class="editable-line" contenteditable="true" spellcheck="false"></span>
+                </div>
+
+                <table class="mortuary-beneficiary">
+                    <caption>BENEFICIARIO DEL FONDO MORTUORIO</caption>
+                    <tbody>
+                        <tr><td>NOMBRE:</td><td contenteditable="true"></td></tr>
+                        <tr><td>PARENTESCO:</td><td contenteditable="true"></td></tr>
+                        <tr><td>TELÉFONO:</td><td contenteditable="true"></td></tr>
+                    </tbody>
+                </table>
+
+                <p class="no-mortuary-date" style="margin-top:8mm;">
+                    <span>Lugar y Fecha:</span>
+                    <span class="editable-line" contenteditable="true" spellcheck="false">{{ $city }}, {{ $day }} de {{ $month }} de {{ $year }}</span>
+                </p>
+
+                <div class="mortuary-signature-row">
+                    <div class="no-mortuary-signature">
+                        <span class="signature-space" contenteditable="true" spellcheck="false"></span>
+                        <span class="signature-name" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>
+                        <span class="signature-id">
+                            Cédula:
+                            <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $identification ?: ' ' }}</span>
+                        </span>
+                    </div>
+                    <img class="mortuary-seal" src="{{ asset('images/sello-las-naves.png') }}" alt="Sello Las Naves">
+                </div>
+            </section>
         @elseif ($isNoMortuaryFund)
             <section class="no-mortuary-document" aria-label="Declaracion sin fondo mortuorio editable">
                 <header class="no-mortuary-header">
@@ -999,7 +1317,16 @@
                     <span class="editable-line" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>
                     <span>certifico que tengo pleno conocimiento de que no soy</span>
                 </p>
-                <p>beneficiario del SERVICIO DE FONDO MORTUORIO, por las razones señaladas a continuación:</p>
+                <p>
+                    beneficiario del fondo mortuorio, a debitar de mi cuenta de ahorros el valor de USD
+                    <strong>10,00 (Diez, 00/100 Dólares)</strong> anuales, para cubrir mi afiliación al Servicio de Fondo
+                    Mortuorio, de acuerdo con las políticas establecidas por la COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES LTDA.
+                </p>
+
+                <p style="text-align:center;">
+                    <strong>Número de Cuenta:</strong>
+                    <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $mortuaryAccountNumber }}</span>
+                </p>
 
                 <div class="no-mortuary-reasons">
                     <div class="no-mortuary-reason">
@@ -1014,10 +1341,6 @@
                         <span class="no-mortuary-check" contenteditable="true" spellcheck="false">( &nbsp; )</span>
                         <span>c. Por contar con un seguro de vida en otra entidad.</span>
                     </div>
-                    <div class="no-mortuary-reason">
-                        <span class="no-mortuary-check" contenteditable="true" spellcheck="false">( &nbsp; )</span>
-                        <span>d. Otros <span class="editable-line short" contenteditable="true" spellcheck="false"></span></span>
-                    </div>
                 </div>
 
                 <p class="no-mortuary-date">
@@ -1025,13 +1348,16 @@
                     <span class="editable-line" contenteditable="true" spellcheck="false">{{ $day }} de {{ $month }} de {{ $year }}</span>
                 </p>
 
-                <div class="no-mortuary-signature">
-                    <span class="signature-space" contenteditable="true" spellcheck="false"></span>
-                    <span class="signature-name" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>
-                    <span class="signature-id">
-                        C.I.:
-                        <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $identification ?: ' ' }}</span>
-                    </span>
+                <div class="mortuary-signature-row">
+                    <div class="no-mortuary-signature">
+                        <span class="signature-space" contenteditable="true" spellcheck="false"></span>
+                        <span class="signature-name" contenteditable="true" spellcheck="false">{{ $fullName ?: ' ' }}</span>
+                        <span class="signature-id">
+                            Cédula:
+                            <span class="editable-line short" contenteditable="true" spellcheck="false">{{ $identification ?: ' ' }}</span>
+                        </span>
+                    </div>
+                    <img class="mortuary-seal" src="{{ asset('images/sello-las-naves.png') }}" alt="Sello Las Naves">
                 </div>
             </section>
         @else

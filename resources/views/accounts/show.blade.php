@@ -4,41 +4,49 @@
     $requirementDocs = $opening->documents->where('document_scope', 'requisito')->keyBy('account_type_requirement_id');
     $internalDocs = $opening->documents->where('document_scope', 'interno')->keyBy('internal_document_template_id');
     $serviceDocs = $opening->documents->where('document_scope', 'servicio')->keyBy('internal_document_template_id');
-    $externalDocs = $opening->externalEvidences->keyBy('external_check_item_id');
+    $externalDocs = $opening->externalEvidences->keyBy(fn ($evidence) => $evidence->subject_key.'_'.$evidence->external_check_item_id);
     $selectedServices = $opening->services->pluck('additional_service_id')->all();
     $consentComplete = $opening->consent?->signed_file_path && $opening->consent?->manual_signature_confirmed;
     $spouseRequirementIds = $opening->accountType->requirements->filter(fn ($requirement) => $requirement->type->slug === 'documentos-conyuge')->pluck('id');
+    $optionalRequirements = $opening->accountType->requirements->where('is_required', false)->reject(fn ($requirement) => $requirement->type->slug === 'documentos-conyuge');
+    $optionalSelectionHistory = $opening->histories->where('action', 'seleccionar_requisitos_opcionales')->sortByDesc('id')->first();
+    $selectedOptionalRequirementIds = collect(data_get($optionalSelectionHistory?->metadata, 'requirement_ids', []));
+    if (!$optionalSelectionHistory) {
+        $selectedOptionalRequirementIds = $selectedOptionalRequirementIds->merge(
+            $opening->documents->where('document_scope', 'requisito')->pluck('account_type_requirement_id')
+        );
+    }
+    $selectedOptionalRequirementIds = $selectedOptionalRequirementIds
+        ->map(fn ($id) => (int) $id)
+        ->intersect($optionalRequirements->pluck('id'))
+        ->unique();
     $requiredRequirementIds = $opening->accountType->requirements
         ->where('is_required', true)
         ->pluck('id')
         ->merge($opening->requires_spouse_documents ? $spouseRequirementIds : collect())
+        ->merge($selectedOptionalRequirementIds)
         ->unique();
     $loadedRequirementIds = $opening->documents->where('document_scope', 'requisito')->whereIn('status', ['cargado', 'validado'])->pluck('account_type_requirement_id');
     $requirementsComplete = $requiredRequirementIds->diff($loadedRequirementIds)->isEmpty();
     $requiredExternalIds = $externalChecks->where('is_required', true)->pluck('id');
-    $loadedExternalIds = $opening->externalEvidences->whereNotNull('screenshot_path')->pluck('external_check_item_id');
-    $externalComplete = $requiredExternalIds->diff($loadedExternalIds)->isEmpty();
+    $externalComplete = collect(array_keys($externalSubjects))->every(function ($subjectKey) use ($opening, $requiredExternalIds) {
+        $loadedExternalIds = $opening->externalEvidences
+            ->where('subject_key', $subjectKey)
+            ->whereNotNull('screenshot_path')
+            ->pluck('external_check_item_id');
+
+        return $requiredExternalIds->diff($loadedExternalIds)->isEmpty();
+    });
     $requiredInternalIds = $internalTemplates->where('is_required', true)->pluck('id');
     $loadedInternalIds = $opening->documents->where('document_scope', 'interno')->whereIn('status', ['cargado', 'validado'])->pluck('internal_document_template_id');
     $internalComplete = $requiredInternalIds->diff($loadedInternalIds)->isEmpty();
     $servicesComplete = $opening->histories->contains('action', 'seleccionar_servicios');
     $serviceTemplatesBySlug = $serviceTemplates->keyBy('slug');
-    $allowsDebitCard = $opening->accountType->slug !== 'cuenta-junior';
-    $selectedServiceModels = $services->whereIn('id', $selectedServices)
-        ->when(!$allowsDebitCard, fn ($selected) => $selected->reject(fn ($service) => $service->slug === 'tarjeta-de-debito'));
     $fondoDecision = data_get(
         $opening->histories->where('action', 'seleccionar_servicios')->sortByDesc('id')->first()?->metadata,
         'fondo_mortuorio'
     );
-    $tarjetaDecision = data_get(
-        $opening->histories->where('action', 'seleccionar_servicios')->sortByDesc('id')->first()?->metadata,
-        'tarjeta_debito'
-    );
-    $selectedServiceTemplateSlugs = $selectedServiceModels
-        ->reject(fn ($service) => $service->slug === 'fondo-mortuorio')
-        ->map(fn ($service) => $serviceTemplatesBySlug->get($serviceDocumentMap[$service->slug] ?? null)?->id)
-        ->filter()
-        ->toBase();
+    $selectedServiceTemplateSlugs = collect();
     if ($fondoDecision === 'si') {
         $selectedServiceTemplateSlugs->push($serviceTemplatesBySlug->get('formulario-servicio-fondo-mortuorio')?->id);
     } elseif ($fondoDecision === 'no') {
@@ -143,10 +151,26 @@
                 <button class="button secondary" type="submit">Guardar condicion</button>
             </form>
         @endif
+        @if ($optionalRequirements->isNotEmpty())
+            <form class="optional-requirements-choice" method="post" action="{{ route('accounts.optional-requirements.update', $opening) }}">
+                @csrf
+                <span>Documentos que aplican:</span>
+                @foreach ($optionalRequirements as $optionalRequirement)
+                    <label>
+                        <input type="checkbox" name="optional_requirements[]" value="{{ $optionalRequirement->id }}" @checked($selectedOptionalRequirementIds->contains($optionalRequirement->id))>
+                        {{ $optionalRequirement->label }}
+                    </label>
+                @endforeach
+                <button class="button secondary" type="submit">Guardar selección</button>
+            </form>
+        @endif
         <div class="checklist">
             @foreach ($opening->accountType->requirements as $requirement)
                 @php $doc = $requirementDocs->get($requirement->id); @endphp
                 @if ($requirement->type->slug === 'documentos-conyuge' && !$opening->requires_spouse_documents)
+                    @continue
+                @endif
+                @if (!$requirement->is_required && $requirement->type->slug !== 'documentos-conyuge' && !$selectedOptionalRequirementIds->contains($requirement->id))
                     @continue
                 @endif
                 <article class="check-item">
@@ -216,34 +240,56 @@
     <section id="externas" class="panel">
         <div class="panel-head">
             <h2>Lista de control externa</h2>
-            <span class="hint">Pegue una evidencia por consulta. El sistema guardara un solo PDF consolidado.</span>
+            <span class="hint">Pegue una evidencia por consulta. El sistema guardará un PDF consolidado por cada persona o entidad revisada.</span>
         </div>
         <form class="external-evidence-form" method="post" action="{{ route('accounts.external.upload', $opening) }}">
             @csrf
-            <div class="external-grid">
-                @foreach ($externalChecks as $item)
-                    @php $evidence = $externalDocs->get($item->id); @endphp
-                    <div>
-                        <h3>{{ $item->name }}</h3>
-                        <a href="{{ $item->url }}" target="_blank" rel="noopener">Abrir enlace oficial</a>
-                        @include('partials.badge', ['status' => $evidence?->screenshot_path ? $evidence->result : 'pendiente'])
-                        <select name="results[{{ $item->id }}]">
-                            <option value="sin_novedad" @selected(($evidence?->result ?? null) === 'sin_novedad')>Sin novedad</option>
-                            <option value="con_observacion" @selected(($evidence?->result ?? null) === 'con_observacion')>Con observacion</option>
-                            <option value="no_aplica" @selected(($evidence?->result ?? null) === 'no_aplica')>No aplica</option>
-                            <option value="pendiente" @selected(($evidence?->result ?? 'pendiente') === 'pendiente')>Pendiente</option>
-                        </select>
-                        <input name="observations[{{ $item->id }}]" value="{{ $evidence?->advisor_observation }}" placeholder="Observacion del asesor">
-                        <input type="hidden" name="evidence_images[{{ $item->id }}]" class="pasted-evidence-input" @required(!$evidence?->screenshot_path)>
-                        <div class="paste-capture compact-paste" tabindex="0">
-                            <span>{{ $evidence?->screenshot_path ? 'Pegar nueva evidencia para reemplazar' : 'Pegar evidencia con Ctrl + V' }}</span>
-                            <img alt="Vista previa de la evidencia pegada" hidden>
-                        </div>
+            @if ($opening->accountType->slug === 'cuenta-juridica')
+                <label class="external-company-choice">
+                    <input type="checkbox" name="company_check_applicable" value="1" @checked($companyExternalCheckApplicable)>
+                    Realizar también la revisión de la empresa cuando aplique
+                </label>
+            @endif
+
+            @php
+                $displaySubjects = $externalSubjects;
+                if ($opening->accountType->slug === 'cuenta-juridica') {
+                    $displaySubjects['empresa'] = 'Empresa';
+                }
+            @endphp
+
+            @foreach ($displaySubjects as $subjectKey => $subjectLabel)
+                <section class="external-subject" data-external-subject="{{ $subjectKey }}" @hidden($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
+                    <div class="external-subject-head">
+                        <h3>Revisión: {{ $subjectLabel }}</h3>
+                        <span>Las cuatro evidencias se guardarán en un PDF consolidado.</span>
                     </div>
-                @endforeach
-            </div>
+                    <div class="external-grid">
+                        @foreach ($externalChecks as $item)
+                            @php $evidence = $externalDocs->get($subjectKey.'_'.$item->id); @endphp
+                            <div>
+                                <h3>{{ $item->name }}</h3>
+                                <a href="{{ $item->url }}" target="_blank" rel="noopener">Abrir enlace oficial</a>
+                                @include('partials.badge', ['status' => $evidence?->screenshot_path ? $evidence->result : 'pendiente'])
+                                <select name="results[{{ $subjectKey }}][{{ $item->id }}]" @disabled($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
+                                    <option value="sin_novedad" @selected(($evidence?->result ?? null) === 'sin_novedad')>Sin novedad</option>
+                                    <option value="con_observacion" @selected(($evidence?->result ?? null) === 'con_observacion')>Con observación</option>
+                                    <option value="no_aplica" @selected(($evidence?->result ?? null) === 'no_aplica')>No aplica</option>
+                                    <option value="pendiente" @selected(($evidence?->result ?? 'pendiente') === 'pendiente')>Pendiente</option>
+                                </select>
+                                <input name="observations[{{ $subjectKey }}][{{ $item->id }}]" value="{{ $evidence?->advisor_observation }}" placeholder="Observación del asesor" @disabled($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
+                                <input type="hidden" name="evidence_images[{{ $subjectKey }}][{{ $item->id }}]" class="pasted-evidence-input" data-has-evidence="{{ $evidence?->screenshot_path ? '1' : '0' }}" @required(!$evidence?->screenshot_path) @disabled($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
+                                <div class="paste-capture compact-paste" tabindex="0">
+                                    <span>{{ $evidence?->screenshot_path ? 'Pegar nueva evidencia para reemplazar' : 'Pegar evidencia con Ctrl + V' }}</span>
+                                    <img alt="Vista previa de la evidencia pegada" hidden>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endforeach
             <div class="actions">
-                <button class="button secondary" type="submit">{{ $externalComplete ? 'Actualizar PDF consolidado' : 'Guardar PDF consolidado' }}</button>
+                <button class="button secondary" type="submit">{{ $externalComplete ? 'Actualizar evidencias' : 'Guardar evidencias' }}</button>
             </div>
         </form>
         @if ($externalComplete)
@@ -266,7 +312,11 @@
                 <article class="check-item">
                     <div>
                         <h3>{{ $template->name }}</h3>
-                        <span class="status">{{ $template->source === 'manual' ? 'MANUAL / EDITABLE' : 'ECONX' }}</span>
+                        <span class="status">{{ match ($template->source) {
+                            'manual' => 'MANUAL / EDITABLE',
+                            'sistema' => 'SISTEMA',
+                            default => 'ECONX',
+                        } }}</span>
                         @if ($template->source === 'manual' && $template->template_path)
                             <div class="doc-actions">
                                 <a href="{{ route('accounts.internal.generate', [$opening, $template]) }}" target="_blank">Abrir documento editable</a>
@@ -277,7 +327,7 @@
                         @elseif ($template->template_path)
                             <a href="{{ route('accounts.internal.original', [$opening, $template]) }}" target="_blank">Ver documento original</a>
                         @else
-                            <span class="hint">Documento obtenido del ECONX</span>
+                            <span class="hint">{{ $template->source === 'sistema' ? 'Documento generado por el sistema' : 'Documento obtenido del ECONX' }}</span>
                         @endif
                         @if ($template->file_name_pattern)
                             <p class="hint">Se guardara como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>
@@ -321,13 +371,6 @@
                     <label><input type="radio" name="fondo_mortuorio" value="si" @checked($fondoDecision === 'si') required> Sí</label>
                     <label><input type="radio" name="fondo_mortuorio" value="no" @checked($fondoDecision === 'no') required> No</label>
                 </fieldset>
-                @if ($allowsDebitCard)
-                    <fieldset class="service-option service-decision">
-                        <legend>Tarjeta de débito</legend>
-                        <label><input type="radio" name="tarjeta_debito" value="si" @checked($tarjetaDecision === 'si') required> Sí</label>
-                        <label><input type="radio" name="tarjeta_debito" value="no" @checked($tarjetaDecision === 'no') required> No</label>
-                    </fieldset>
-                @endif
             </div>
             <div class="actions">
                 <button class="button primary" type="submit">Guardar servicios</button>
@@ -447,7 +490,9 @@
                     @foreach ($opening->accountType->requirements as $requirement)
                         @php
                             $isSpouseRequirement = $requirement->type->slug === 'documentos-conyuge';
-                            $isRequiredForOpening = $requirement->is_required || ($isSpouseRequirement && $opening->requires_spouse_documents);
+                            $isRequiredForOpening = $requirement->is_required
+                                || ($isSpouseRequirement && $opening->requires_spouse_documents)
+                                || $selectedOptionalRequirementIds->contains($requirement->id);
                             $doc = $requirementDocs->get($requirement->id);
                         @endphp
                         @continue(!$isRequiredForOpening)

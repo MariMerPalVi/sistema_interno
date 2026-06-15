@@ -168,6 +168,45 @@ a:hover { text-decoration: underline; }
   border-radius: 8px;
 }
 
+.optional-requirements-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--subtle);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.optional-requirements-choice > span {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.optional-requirements-choice label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.optional-requirements-choice input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.optional-requirements-choice .button {
+  min-height: 30px;
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 .process-card,
 .account-type-card {
   display: grid;
@@ -575,6 +614,55 @@ select:focus {
   grid-template-columns: repeat(4, minmax(290px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.external-subject {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.external-subject[hidden] {
+  display: none;
+}
+
+.external-subject-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+.external-subject-head h3 {
+  margin: 0;
+  color: var(--ink);
+}
+
+.external-subject-head span {
+  color: var(--muted);
+}
+
+.external-company-choice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  margin: 10px 0 2px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--subtle);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.external-company-choice input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--primary);
 }
 
 .external-grid > div {

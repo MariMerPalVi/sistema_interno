@@ -20,6 +20,7 @@ Route::prefix('aperturas')->name('accounts.')->group(function () {
     Route::get('/{opening}/enviar-revision', fn ($opening) => redirect()->route('accounts.show', [$opening, 'paso' => 'resumen']));
     Route::post('/{opening}/socio', [AccountOpeningController::class, 'updateMember'])->name('member.update');
     Route::post('/{opening}/conyuge', [AccountOpeningController::class, 'updateSpouseRequirement'])->name('spouse.update');
+    Route::post('/{opening}/requisitos-opcionales', [AccountOpeningController::class, 'updateOptionalRequirements'])->name('optional-requirements.update');
     Route::post('/{opening}/consentimiento', [AccountOpeningController::class, 'uploadConsent'])->name('consent.upload');
     Route::post('/{opening}/documentos', [AccountOpeningController::class, 'uploadRequirement'])->name('requirements.upload');
     Route::post('/{opening}/consulta-externa', [AccountOpeningController::class, 'uploadExternalEvidence'])->name('external.upload');

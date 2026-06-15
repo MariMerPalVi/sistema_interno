@@ -16,6 +16,7 @@ class AutomatedReviewService
             'consent',
             'documents',
             'externalEvidences',
+            'histories',
             'services.additionalService',
         ]);
 
@@ -110,30 +111,59 @@ class AutomatedReviewService
     private function reviewExternalChecks(AccountOpening $opening): array
     {
         $findings = [];
-        $evidences = $opening->externalEvidences->keyBy('external_check_item_id');
+        $evidences = $opening->externalEvidences->keyBy(
+            fn ($evidence) => $evidence->subject_key.'_'.$evidence->external_check_item_id
+        );
 
-        foreach (ExternalCheckItem::where('active', true)->orderBy('sort_order')->get() as $item) {
-            $evidence = $evidences->get($item->id);
+        foreach ($this->externalCheckSubjects($opening) as $subjectKey => $subjectLabel) {
+            foreach (ExternalCheckItem::where('active', true)->orderBy('sort_order')->get() as $item) {
+                $evidence = $evidences->get($subjectKey.'_'.$item->id);
+                $findingTitle = "{$item->name} - {$subjectLabel}";
 
-            if (!$evidence || !$evidence->screenshot_path) {
-                $findings[] = $this->finding('error', $item->name, 'No tiene evidencia cargada.');
-                continue;
-            }
+                if (!$evidence || !$evidence->screenshot_path) {
+                    $findings[] = $this->finding('error', $findingTitle, 'No tiene evidencia cargada.');
+                    continue;
+                }
 
-            if (!Storage::exists($evidence->screenshot_path)) {
-                $findings[] = $this->finding('error', $item->name, 'El PDF consolidado de evidencias no existe.');
-            }
+                if (!Storage::exists($evidence->screenshot_path)) {
+                    $findings[] = $this->finding('error', $findingTitle, 'El PDF consolidado de evidencias no existe.');
+                }
 
-            if ($evidence->result === 'pendiente') {
-                $findings[] = $this->finding('error', $item->name, 'La linea de control sigue pendiente.');
-            }
+                if ($evidence->result === 'pendiente') {
+                    $findings[] = $this->finding('error', $findingTitle, 'La linea de control sigue pendiente.');
+                }
 
-            if ($evidence->result === 'con_observacion') {
-                $findings[] = $this->finding('warning', $item->name, 'La consulta fue marcada con observacion.');
+                if ($evidence->result === 'con_observacion') {
+                    $findings[] = $this->finding('warning', $findingTitle, 'La consulta fue marcada con observacion.');
+                }
             }
         }
 
         return $findings;
+    }
+
+    private function externalCheckSubjects(AccountOpening $opening): array
+    {
+        $companyApplicable = (bool) data_get(
+            $opening->histories
+                ->where('action', 'cargar_evidencia_externa')
+                ->sortByDesc('id')
+                ->first()?->metadata,
+            'company_check_applicable',
+            false
+        );
+
+        return match ($opening->accountType->slug) {
+            'cuenta-junior' => [
+                'representante' => 'Representante',
+                'menor' => 'Menor',
+            ],
+            'cuenta-juridica' => array_filter([
+                'representante_legal' => 'Representante legal',
+                'empresa' => $companyApplicable ? 'Empresa' : null,
+            ]),
+            default => ['titular' => 'Titular'],
+        };
     }
 
     private function reviewInternalDocuments(AccountOpening $opening): array

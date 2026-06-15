@@ -57,7 +57,7 @@ class DatabaseSeeder extends Seeder
 
         $types = collect([
             ['Cuenta Basica', 'cuenta-basica', 'Si es casado o mantiene union de hecho, solicitar documentos del conyuge.', true],
-            ['Cuenta Ahorro Programado', 'cuenta-ahorro-programado', 'Incluye revision de documentos del conyuge cuando aplique.', true],
+            ['Cuenta Ahorros', 'cuenta-ahorro-programado', 'Incluye revision de documentos del conyuge cuando aplique.', true],
             ['Cuenta Junior', 'cuenta-junior', 'Apertura para menor con representante.', false],
             ['Cuenta Juridica', 'cuenta-juridica', 'Apertura para instituciones o personas juridicas.', false],
         ])->map(fn ($type) => AccountType::updateOrCreate(['slug' => $type[1]], [
@@ -116,7 +116,6 @@ class DatabaseSeeder extends Seeder
             ['declaracion-renta', 'Pago de impuesto a la renta del anio inmediato anterior', 'Pago impuesto renta_{expediente}'],
             ['poder-autorizacion', 'Poder en caso de tramite por tercero si aplica', 'Poder_{expediente}', false],
             ['acta-constitucion', 'Acta notariada de la constitucion de la sociedad si aplica', 'Acta constitucion_{expediente}', false],
-            ['firmas-autorizadas', 'Personas autorizadas para firmas', 'Personas autorizadas firmas_{expediente}'],
         ]);
 
         foreach ([
@@ -141,7 +140,7 @@ class DatabaseSeeder extends Seeder
         }
 
         AdditionalService::query()->update(['active' => false]);
-        foreach (['Fondo mortuorio', 'Tarjeta de debito'] as $name) {
+        foreach (['Fondo mortuorio'] as $name) {
             AdditionalService::updateOrCreate(['slug' => Str::slug($name)], [
                 'name' => $name,
                 'description' => 'Servicio configurable para registrar dentro del expediente.',
@@ -150,9 +149,8 @@ class DatabaseSeeder extends Seeder
         }
 
         foreach ([
-            ['Formulario del servicio de fondo mortuorio', 'formulario-servicio-fondo-mortuorio', null, 'Formulario servicio Fondo Mortuorio_{expediente}', 1],
+            ['Formulario del servicio de fondo mortuorio', 'formulario-servicio-fondo-mortuorio', 'formatos/CON_FONDO_MORTUORIO.pdf', 'Formulario servicio Fondo Mortuorio_{expediente}', 1],
             ['Declaracion sin fondo mortuorio', 'sin-fondo-mortuorio', 'formatos/SIN_FONDO_MORTUORIO.pdf', 'Sin Fondo Mortuorio_{expediente}', 2],
-            ['Solicitud de tarjeta de debito', 'solicitud-tarjeta-de-debito', null, 'Solicitud tarjeta de debito_{expediente}', 3],
         ] as [$name, $slug, $templatePath, $pattern, $order]) {
             InternalDocumentTemplate::updateOrCreate(['slug' => $slug], [
                 'account_type_id' => null,
@@ -166,6 +164,7 @@ class DatabaseSeeder extends Seeder
                 'sort_order' => $order,
             ]);
         }
+        InternalDocumentTemplate::where('slug', 'solicitud-tarjeta-de-debito')->update(['active' => false]);
 
         foreach ([
             ['Brindar informacion de servicios', 'Registrar que se informaron requisitos, beneficios, tasas y servicios de la cooperativa.', 'Asistente Operativo'],
@@ -220,7 +219,11 @@ class DatabaseSeeder extends Seeder
     private function syncInternalDocuments(AccountType $accountType): void
     {
         $isLegal = $accountType->slug === 'cuenta-juridica';
-        $solicitudPath = 'formatos/1-solicitud-de-ingreso.pdf';
+        $solicitudPath = match ($accountType->slug) {
+            'cuenta-junior' => 'formatos/SOLICITUD DE INGRESO-MENOR DE EDAD.pdf',
+            'cuenta-juridica' => 'formatos/SOLICITUD_INGRESO_CUENTA_JURIDICA.pdf',
+            default => 'formatos/1-solicitud-de-ingreso.pdf',
+        };
 
         if (in_array($accountType->slug, ['cuenta-basica', 'cuenta-ahorro-programado'], true)) {
             $items = [
@@ -237,12 +240,14 @@ class DatabaseSeeder extends Seeder
             }
         } elseif ($isLegal) {
             $items = [
+                ['Formulario solicitud apertura de cuenta/actualizacion de datos', null, 'Formulario solicitud apertura cuenta_{expediente}', true, 'sistema'],
+                ['Formulario conozca a su cliente / socio', null, 'Formulario conozca cliente socio_{expediente}', true, 'sistema'],
                 ['Solicitud de ingreso al consejo de administracion', $solicitudPath, 'Solicitud ingreso consejo administracion_{expediente}', true, 'manual'],
+                ['Contrato de apertura de cuenta de ahorros', null, 'Contrato apertura cuenta ahorros_{expediente}', true, 'sistema'],
+                ['Formulario autocertificacion residencia fiscal', null, 'Formulario autocertificacion residencia fiscal_{expediente}', true, 'sistema'],
                 ['Formulario conozca su cliente - juridica', null, 'Formulario conozca cliente juridica_{expediente}', true, 'manual'],
                 ['Formulario conozca su cliente - representante legal', null, 'Formulario conozca cliente representante legal_{expediente}', true, 'manual'],
                 ['Registro de firmas', 'formatos/REGISTRO_DE_FIRMAS.pdf', '6. Registro de firmas_{expediente}', true, 'manual'],
-                ['Contrato de apertura de cuenta de ahorros', null, 'Contrato apertura cuenta ahorros_{expediente}', true, 'econx'],
-                ['No residente', null, 'No residente_{expediente}', true, 'econx'],
             ];
         } else {
             $items = [

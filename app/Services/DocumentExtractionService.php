@@ -49,9 +49,11 @@ class DocumentExtractionService
             }
         }
 
-        $ocrText = $this->extractTextWithWindowsOcr($file);
-        if (mb_strlen($ocrText) > 30) {
-            $text = trim($text."\n".$ocrText);
+        if (config('opening.ocr_enabled', false)) {
+            $ocrText = $this->extractTextWithWindowsOcr($file);
+            if (mb_strlen($ocrText) > 30) {
+                $text = trim($text."\n".$ocrText);
+            }
         }
 
         return $text;
@@ -121,17 +123,12 @@ class DocumentExtractionService
     private function extractId(string $text): array
     {
         $ids = $this->validEcuadorianIds($text);
-        $fullName = $this->matchFirst($text, [
-            '/CERTIFICADO DE VOTACI[ÓO]N.*?(?:\d{4}|VUELTA)\s+([A-ZÁÉÍÓÚÑ ]{8,80})\s+PROVIN/si',
-            '/(?:SEGUNDA VUELTA|PRIMERA VUELTA)\s+([A-ZÁÉÍÓÚÑ ]{8,80})\s+PROVIN/si',
-            '/(?:APELLIDOS Y NOMBRES|NOMBRES Y APELLIDOS|NOMBRE)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ ]{8,80})/',
-            '/(?:CIUDADANO|CIUDADANA)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ ]{8,80})/',
-        ]);
+        $fullName = $this->extractPersonName($text);
 
         return [
             'cedula' => $ids[0] ?? null,
             'cedula_valida' => isset($ids[0]),
-            'nombres_apellidos' => $this->cleanPersonName($fullName),
+            'nombres_apellidos' => $fullName,
             'nacionalidad' => $this->matchFirst($text, [
                 '/NACIONALIDAD\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ ]{4,40})/',
                 '/\b(ECUATORIANA|ECUATORIANO|COLOMBIANA|COLOMBIANO|VENEZOLANA|VENEZOLANO)\b/',
@@ -222,9 +219,60 @@ class DocumentExtractionService
 
         $name = preg_replace('/\b(PRIMERA|SEGUNDA|VUELTA|ELECCIONES|GENERALES|CERTIFICADO|VOTACION|VOTACIÓN)\b/u', ' ', $name) ?? $name;
         $name = str_replace(['ESCPBAR', 'BOSOUEZ', 'BOSQUEZ'], ['ESCOBAR', 'BOSQUEZ', 'BOSQUEZ'], $name);
+        $name = preg_replace('/[^A-ZÁÉÍÓÚÑ ]/u', ' ', $name) ?? $name;
         $name = preg_replace('/\s+/', ' ', $name) ?? $name;
 
-        return trim($name) ?: null;
+        $name = trim($name);
+
+        return $this->isPlausiblePersonName($name) ? $name : null;
+    }
+
+    private function extractPersonName(string $text): ?string
+    {
+        $patterns = [
+            '/CERTIFICADO DE VOTACI[ÓO]N.*?(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVIN(?:CIA|GA)?\b/si',
+            '/(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVIN(?:CIA|GA)?\b/si',
+            '/(?:APELLIDOS Y NOMBRES|NOMBRES Y APELLIDOS)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si',
+            '/(?:CIUDADANO|CIUDADANA)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (!preg_match($pattern, $text, $matches)) {
+                continue;
+            }
+
+            $candidate = $this->cleanPersonName($matches[1] ?? null);
+            if ($candidate) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function isPlausiblePersonName(string $name): bool
+    {
+        if ($name === '' || mb_strlen($name) < 7 || mb_strlen($name) > 100) {
+            return false;
+        }
+
+        $blockedWords = [
+            'CEDULA', 'CÉDULA', 'IDENTIDAD', 'REPUBLICA', 'REPÚBLICA', 'ECUADOR',
+            'APELLIDOS', 'NOMBRES', 'NOMBRE', 'NACIONALIDAD', 'CIUDADANIA', 'CIUDADANÍA',
+            'CERTIFICADO', 'VOTACION', 'VOTACIÓN', 'PROVINCIA', 'CANTON', 'CANTÓN',
+            'PARROQUIA', 'FECHA', 'ELECCIONES', 'PADRE', 'MADRE', 'CONDICION', 'CONDICIÓN',
+            'CONYUGE', 'CÓNYUGE', 'REPRESENTANTE',
+        ];
+
+        foreach ($blockedWords as $word) {
+            if (preg_match('/\b'.preg_quote($word, '/').'\b/u', $name)) {
+                return false;
+            }
+        }
+
+        $tokens = array_values(array_filter(explode(' ', $name), fn (string $token) => mb_strlen($token) >= 2));
+
+        return count($tokens) >= 2 && count($tokens) <= 7;
     }
 
     private function validEcuadorianIds(string $text): array

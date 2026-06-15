@@ -11,6 +11,7 @@ class ExternalCheckEvidence extends Model
     protected $fillable = [
         'account_opening_id',
         'external_check_item_id',
+        'subject_key',
         'result',
         'screenshot_path',
         'advisor_observation',

@@ -90,8 +90,27 @@ document.querySelectorAll('.paste-capture').forEach((zone) => {
 });
 
 document.querySelectorAll('.external-evidence-form').forEach((form) => {
+  const companyChoice = form.querySelector('input[name="company_check_applicable"]');
+  const companySection = form.querySelector('[data-external-subject="empresa"]');
+
+  const syncCompanySection = () => {
+    if (!companyChoice || !companySection) return;
+
+    const enabled = companyChoice.checked;
+    companySection.hidden = !enabled;
+    companySection.querySelectorAll('input, select').forEach((control) => {
+      control.disabled = !enabled;
+      if (control.classList.contains('pasted-evidence-input')) {
+        control.required = enabled && control.dataset.hasEvidence !== '1';
+      }
+    });
+  };
+
+  companyChoice?.addEventListener('change', syncCompanySection);
+  syncCompanySection();
+
   form.addEventListener('submit', (event) => {
-    const inputs = Array.from(form.querySelectorAll('.pasted-evidence-input'));
+    const inputs = Array.from(form.querySelectorAll('.pasted-evidence-input:not(:disabled)'));
     const anyPasted = inputs.some((input) => input.value);
     const missingInput = inputs.find((input) => !input.value && (input.required || anyPasted));
 
