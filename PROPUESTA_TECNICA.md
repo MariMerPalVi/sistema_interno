@@ -18,7 +18,7 @@ El sistema web interno centraliza procesos operativos de la cooperativa. En esta
 10. El asesor registra evidencias de consultas externas obligatorias.
 11. Se cargan documentos internos firmados.
 12. Se seleccionan servicios adicionales.
-13. Se registra el cierre operativo segun el manual institucional: apertura en Econx, impresion de documentos, verificacion de firmas contra cedula, generacion de cuentas solicitadas, direccionamiento a caja para deposito inicial y libreta, archivo fisico/digital, revision del Jefe de Captaciones y verificacion del Oficial de Cumplimiento.
+13. Se registra el cierre operativo segun el manual institucional: apertura en el sistema, impresion de documentos, verificacion de firmas contra cedula, generacion de cuentas solicitadas, direccionamiento a caja para deposito inicial y libreta, archivo fisico/digital, revision del Jefe de Captaciones y verificacion del Oficial de Cumplimiento.
 14. Se revisa el resumen y se envia el expediente a `en_revision`.
 
 ## Pantallas
@@ -82,11 +82,11 @@ Tablas principales:
 
 El manual institucional define el proceso `PROD-CAP-PR-13`, macroproceso Captaciones, proceso Manejo de cuentas, subproceso Apertura de cuentas. El sistema incorpora sus responsables y actividades:
 
-- Asistente Operativo: informa servicios, solicita consentimiento, revisa documentos, revisa listas de control, apertura en Econx, imprime documentos, verifica firmas, genera cuentas, direcciona a caja/libreta y archiva expediente.
+- Asistente Operativo: informa servicios, solicita consentimiento, revisa documentos, revisa listas de control, apertura en el sistema, imprime documentos, verifica firmas, genera cuentas, direcciona a caja/libreta y archiva expediente.
 - Jefe de Captaciones: revisa documentacion fisica y digital completa y correcta.
 - Oficial de Cumplimiento: verifica expedientes fisicos y digitales sin errores.
 
-La apertura en Econx queda registrada como actividad operativa con numero de cuenta, observacion, estado, fecha/hora y auditoria.
+La apertura en el sistema queda registrada como actividad operativa con numero de cuenta, observacion, estado, fecha/hora y auditoria.
 
 ## Integraciones futuras
 

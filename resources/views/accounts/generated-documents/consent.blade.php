@@ -322,58 +322,58 @@
             <section class="content">
                 <h1>Consentimiento para el tratamiento de datos personales</h1>
 
-                <p>En cumplimiento de la Ley Organica de Proteccion de Datos Personales (LOPDP) vigente en materia de proteccion de datos personales y privacidad, <strong>COOPERATIVA DE AHORRO Y CREDITO LAS NAVES LTDA.</strong>, en adelante “la Cooperativa”, informa a sus socios y clientes sobre el tratamiento de sus datos personales y solicita su consentimiento para dicho tratamiento.</p>
+                <p>En cumplimiento de la Ley Orgánica de Protección de Datos Personales (LOPDP) vigente en materia de proteccion de datos personales y privacidad, <strong>COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES LTDA.</strong>, en adelante “la Cooperativa”, informa a sus socios y clientes sobre el tratamiento de sus datos personales y solicita su consentimiento para dicho tratamiento.</p>
 
                 <div class="info-block">
-                    <p><strong>Nombre de la Cooperativa:</strong> Cooperativa de Ahorro y Credito Las Naves Ltda.</p>
-                    <p><strong>Direccion:</strong> Las Naves, Calle 12 de octubre y 10 de agosto.</p>
-                    <p><strong>Telefono:</strong> (03) 2996730</p>
-                    <p><strong>Correo Electronico:</strong> info@cooplasnaves.fin.ec</p>
+                    <p><strong>Nombre de la Cooperativa:</strong> Cooperativa de Ahorro y Crédito Las Naves Ltda.</p>
+                    <p><strong>Dirección:</strong> Las Naves, Calle 12 de octubre y 10 de agosto.</p>
+                    <p><strong>Teléfono:</strong> (03) 2996730</p>
+                    <p><strong>Correo electrónico:</strong> info@cooplasnaves.fin.ec</p>
                 </div>
 
                 <div class="info-block">
-                    <p><strong>Identificacion del Delegado de Proteccion de Datos (DPO)</strong></p>
+                    <p><strong>Identificación del Delegado de Protección de Datos (DPO)</strong></p>
                     <p><strong>Nombre:</strong> Abg. Nathaly Roxana Barcenes Coles</p>
-                    <p><strong>Direccion:</strong> Las Naves, Calle 12 de octubre y 10 de agosto.</p>
-                    <p><strong>Telefono:</strong> (03) 2996730</p>
-                    <p><strong>Correo Electronico:</strong> protecciondatospersonales@cooplasnaves.fin.ec</p>
+                    <p><strong>Dirección:</strong> Las Naves, Calle 12 de octubre y 10 de agosto.</p>
+                    <p><strong>Teléfono:</strong> (03) 2996730</p>
+                    <p><strong>Correo electrónico:</strong> protecciondatospersonales@cooplasnaves.fin.ec</p>
                 </div>
 
                 <div class="section-title">1. Principios del Tratamiento de Datos Personales</div>
-                <p>El tratamiento de sus datos personales se realizara bajo los siguientes principios establecidos en la Ley Organica de Proteccion de Datos Personales (LOPDP):</p>
+                <p>El tratamiento de sus datos personales se realizará bajo los siguientes principios establecidos en la Ley Orgánica de Protección de Datos Personales (LOPDP):</p>
                 <ul class="list">
-                    <li><strong>Juridicidad:</strong> Los datos personales deben tratarse conforme a los principios, derechos y obligaciones establecidos en la Constitucion, los instrumentos internacionales, esta ley y su reglamento.</li>
-                    <li><strong>Lealtad:</strong> El tratamiento de datos debe ser leal y claro para los titulares, quienes deben estar al tanto de como se estan manejando sus datos personales.</li>
-                    <li><strong>Finalidad:</strong> Los datos deben ser tratados con fines determinados, explicitos, legitimos y comunicados al titular. No se pueden tratar datos para fines distintos a los inicialmente establecidos sin autorizacion.</li>
-                    <li><strong>Minimizacion de datos personales:</strong> Los datos tratados deben ser pertinentes y limitados a lo estrictamente necesario para cumplir con la finalidad del tratamiento.</li>
+                    <li><strong>Juridicidad:</strong> Los datos personales deben tratarse conforme a los principios, derechos y obligaciones establecidos en la Constitución, los instrumentos internacionales, esta ley y su reglamento.</li>
+                    <li><strong>Lealtad:</strong> El tratamiento de datos debe ser leal y claro para los titulares, quienes deben estar al tanto de cómo se están manejando sus datos personales.</li>
+                    <li><strong>Finalidad:</strong> Los datos deben ser tratados con fines determinados, explícitos, legítimos y comunicados al titular. No se pueden tratar datos para fines distintos a los inicialmente establecidos sin autorización.</li>
+                    <li><strong>Minimización de datos personales:</strong> Los datos tratados deben ser pertinentes y limitados a lo estrictamente necesario para cumplir con la finalidad del tratamiento.</li>
                     <li><strong>Confidencialidad:</strong> Los datos personales deben ser tratados de manera confidencial y solo ser accesibles a personas autorizadas.</li>
-                    <li><strong>Conservacion:</strong> Los datos personales deben ser conservados solo durante el tiempo necesario para cumplir con la finalidad para la cual fueron recogidos.</li>
-                    <li><strong>Seguridad de datos personales:</strong> Los responsables del tratamiento deben implementar medidas tecnicas y organizativas para garantizar la seguridad de los datos personales y prevenir su acceso no autorizado, perdida o destruccion.</li>
+                    <li><strong>Conservación:</strong> Los datos personales deben ser conservados solo durante el tiempo necesario para cumplir con la finalidad para la cual fueron recogidos.</li>
+                    <li><strong>Seguridad de datos personales:</strong> Los responsables del tratamiento deben implementar medidas técnicas y organizativas para garantizar la seguridad de los datos personales y prevenir su acceso no autorizado, pérdida o destrucción.</li>
                 </ul>
 
                 <div class="section-title">2. Finalidad del Tratamiento de Datos Personales</div>
-                <p>Los datos personales que usted proporcione seran tratados para las siguientes finalidades:</p>
+                <p>Los datos personales que usted proporcione serán tratados para las siguientes finalidades:</p>
                 <p><strong>Finalidades necesarias (no requieren consentimiento):</strong></p>
                 <ul class="list">
-                    <li>Gestion operativa y administracion de la relacion contractual derivada de los servicios financieros ofrecidos por la Cooperativa.</li>
+                    <li>Gestión operativa y administración de la relación contractual derivada de los servicios financieros ofrecidos por la Cooperativa.</li>
                     <li>Cumplimiento de obligaciones legales, regulatorias y contractuales aplicables.</li>
-                    <li>Evaluacion crediticia, analisis de riesgo y verificacion de informacion para la prestacion de servicios financieros.</li>
+                    <li>Evaluación crediticia, análisis de riesgo y verificación de información para la prestación de servicios financieros.</li>
                 </ul>
                 <p><strong>Finalidades opcionales (requieren su consentimiento):</strong></p>
                 <ul class="list">
-                    <li>Envio de informacion comercial, promociones, ofertas y campanas relacionadas con los productos y servicios de la Cooperativa.</li>
-                    <li>Contacto a traves de medios electronicos, telefonicos o digitales con fines informativos o comerciales.</li>
+                    <li>Envío de información comercial, promociones, ofertas y campañas relacionadas con los productos y servicios de la Cooperativa.</li>
+                    <li>Contacto a través de medios electrónicos, telefónicos o digitales con fines informativos o comerciales.</li>
                     <li>Uso de imagen para fines publicitarios.</li>
                 </ul>
-                <p>El titular podra aceptar o rechazar las finalidades opcionales, sin que ello afecte la prestacion de los servicios principales ofrecidos por la Cooperativa.</p>
+                <p>El titular podrá aceptar o rechazar las finalidades opcionales, sin que ello afecte la prestación de los servicios principales ofrecidos por la Cooperativa.</p>
 
                 <div class="section-title">3. Tipos de Datos Personales Recolectados</div>
                 <ul class="list">
-                    <li><strong>Datos personales:</strong> Nombres, Apellidos, cedula de identidad, codigo dactilar, fecha de nacimiento, edad, lugar de nacimiento, estado civil, etc.</li>
-                    <li><strong>Datos de contacto:</strong> Direccion domicilio, direccion de trabajo, telefono, correo electronico, referencias personales, etc.</li>
-                    <li><strong>Datos laborales:</strong> instruccion academica, Cargo, historial laboral, etc.</li>
+                    <li><strong>Datos personales:</strong> Nombres, Apellidos, cédula de identidad, código dactilar, fecha de nacimiento, edad, lugar de nacimiento, estado civil, etc.</li>
+                    <li><strong>Datos de contacto:</strong> Dirección domiciliaria, dirección de trabajo, teléfono, correo electrónico, referencias personales, etc.</li>
+                    <li><strong>Datos laborales:</strong> instrucción académica, Cargo, historial laboral, etc.</li>
                     <li><strong>Datos financieros:</strong> Cuentas bancarias, saldo en las cuentas, ingresos y egresos, salario, etc.</li>
-                    <li><strong>Datos sensibles:</strong> Solo se recolectaran y trataran datos personales sensibles, tales como estado de salud, identidad de genero, etnia, pasado judicial, cargas familiares u otros de naturaleza similar, con su consentimiento explicito y unicamente cuando resulte estrictamente necesario para el cumplimiento de finalidades legitimas, aplicando medidas reforzadas de seguridad y confidencialidad conforme a la normativa vigente.</li>
+                    <li><strong>Datos sensibles:</strong> Solo se recolectarán y tratarán datos personales sensibles, tales como estado de salud, identidad de género, etnia, pasado judicial, cargas familiares u otros de naturaleza similar, con su consentimiento explícito y únicamente cuando resulte estrictamente necesario para el cumplimiento de finalidades legítimas, aplicando medidas reforzadas de seguridad y confidencialidad conforme a la normativa vigente.</li>
                 </ul>
             </section>
         </article>
@@ -382,48 +382,48 @@
             <img class="sheet-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
             <section class="content">
                 <div class="section-title">4. Base Legal del Tratamiento</div>
-                <p>El tratamiento de sus datos personales se realiza conforme a lo establecido en la Ley Organica de Proteccion de Datos Personales (LOPDP) y su Reglamento General. La base legal para el tratamiento incluye:</p>
-                <p>a) Su consentimiento explicito para el tratamiento de sus datos personales. b) El cumplimiento de obligaciones legales y contractuales. c) El interes legitimo de la Cooperativa, siempre que no prevalezcan sus derechos fundamentales.</p>
-                <p>El consentimiento sera requerido unicamente cuando el tratamiento no pueda sustentarse en otra base de legitimacion prevista en la normativa aplicable.</p>
+                <p>El tratamiento de sus datos personales se realiza conforme a lo establecido en la Ley Orgánica de Protección de Datos Personales (LOPDP) y su Reglamento General. La base legal para el tratamiento incluye:</p>
+                <p>a) Su consentimiento explícito para el tratamiento de sus datos personales. b) El cumplimiento de obligaciones legales y contractuales. c) El interés legítimo de la Cooperativa, siempre que no prevalezcan sus derechos fundamentales.</p>
+                <p>El consentimiento será requerido únicamente cuando el tratamiento no pueda sustentarse en otra base de legitimación prevista en la normativa aplicable.</p>
 
                 <div class="section-title">5. Derechos del Titular de los Datos Personales</div>
                 <ul class="list">
-                    <li><strong>Acceso:</strong> Conocer que datos personales estan siendo tratados y como.</li>
-                    <li><strong>Rectificacion:</strong> Solicitar la correccion de datos inexactos o incompletos.</li>
-                    <li><strong>Eliminacion:</strong> Solicitar la eliminacion de sus datos cuando ya no sean necesarios para las finalidades para las que fueron recogidos.</li>
-                    <li><strong>Oposicion:</strong> Oponerse al tratamiento de sus datos personales en ciertos casos, como el uso para mercadotecnia directa.</li>
+                    <li><strong>Acceso:</strong> Conocer qué datos personales están siendo tratados y cómo.</li>
+                    <li><strong>Rectificación:</strong> Solicitar la corrección de datos inexactos o incompletos.</li>
+                    <li><strong>Eliminación:</strong> Solicitar la eliminacion de sus datos cuando ya no sean necesarios para las finalidades para las que fueron recogidos.</li>
+                    <li><strong>Oposición:</strong> Oponerse al tratamiento de sus datos personales en ciertos casos, como el uso para mercadotecnia directa.</li>
                     <li><strong>Portabilidad:</strong> Recibir sus datos personales en un formato estructurado y transmitirlos a otro responsable.</li>
-                    <li><strong>Revocacion del consentimiento:</strong> Revocar su consentimiento en cualquier momento, sin que esto afecte la legalidad del tratamiento realizado antes de la revocacion.</li>
-                    <li><strong>No ser objeto de decisiones automatizadas:</strong> No ser sometido a decisiones basadas unicamente en valoraciones automatizadas.</li>
+                    <li><strong>Revocación del consentimiento:</strong> Revocar su consentimiento en cualquier momento, sin que esto afecte la legalidad del tratamiento realizado antes de la revocación.</li>
+                    <li><strong>No ser objeto de decisiones automatizadas:</strong> No ser sometido a decisiones basadas únicamente en valoraciones automatizadas.</li>
                 </ul>
 
                 <div class="section-title">6. Procedimiento para Ejercer sus Derechos</div>
-                <p>Para ejercer sus derechos, puede presentar una solicitud por escrito o por correo electronico dirigido al Responsable del Tratamiento de Datos Personales y al Delegado de Proteccion de Datos (DPO), indicando claramente el derecho que desea ejercer. La solicitud debe incluir:</p>
+                <p>Para ejercer sus derechos, puede presentar una solicitud por escrito o por correo electrónico dirigido al Responsable del Tratamiento de Datos Personales y al Delegado de Protección de Datos (DPO), indicando claramente el derecho que desea ejercer. La solicitud debe incluir:</p>
                 <ul class="list">
                     <li>Su nombre completo y copia de su documento de identidad.</li>
-                    <li>Descripcion clara y precisa de los datos personales sobre los cuales desea ejercer el derecho.</li>
+                    <li>Descripción clara y precisa de los datos personales sobre los cuales desea ejercer el derecho.</li>
                     <li>Medio de contacto para recibir notificaciones.</li>
                 </ul>
-                <p>El responsable del tratamiento respondera a su solicitud en un plazo maximo de 15 dias habiles.</p>
+                <p>El responsable del tratamiento responderá a su solicitud en un plazo máximo de 15 días hábiles.</p>
 
                 <div class="section-title">7. Transferencia de Datos Personales</div>
-                <p>Sus datos personales podran ser transferidos a terceros unicamente en los casos permitidos por la Ley y para las finalidades descritas en este documento. En caso de transferencias internacionales, se garantizara que los destinatarios cumplan con los estandares de proteccion de datos establecidos en la LOPDP.</p>
+                <p>Sus datos personales podrán ser transferidos a terceros únicamente en los casos permitidos por la Ley y para las finalidades descritas en este documento. En caso de transferencias internacionales, se garantizará que los destinatarios cumplan con los estándares de protección de datos establecidos en la LOPDP.</p>
 
-                <div class="section-title">8. Plazo de Conservacion de los Datos</div>
-                <p>Sus datos personales seran conservados durante el tiempo necesario para cumplir con las finalidades descritas en el presente documento, asi como para atender obligaciones legales, regulatorias y contractuales aplicables.</p>
+                <div class="section-title">8. Plazo de Conservación de los Datos</div>
+                <p>Sus datos personales serán conservados durante el tiempo necesario para cumplir con las finalidades descritas en el presente documento, así como para atender obligaciones legales, regulatorias y contractuales aplicables.</p>
                 <ul class="list">
-                    <li>Datos relacionados con la relacion contractual y servicios financieros: durante la vigencia de la relacion y hasta 10 anos posteriores a su finalizacion, cuando exista obligacion regulatoria aplicable.</li>
-                    <li>Documentacion contable, tributaria y contractual: hasta 7 anos, conforme a la normativa aplicable.</li>
-                    <li>Registros de videovigilancia u otros medios de control: entre 30 y 90 dias, salvo requerimiento de autoridad competente o existencia de incidentes.</li>
+                    <li>Datos relacionados con la relación contractual y servicios financieros: durante la vigencia de la relación y hasta 10 años posteriores a su finalización, cuando exista obligación regulatoria aplicable.</li>
+                    <li>Documentación contable, tributaria y contractual: hasta 7 años, conforme a la normativa aplicable.</li>
+                    <li>Registros de videovigilancia u otros medios de control: entre 30 y 90 días, salvo requerimiento de autoridad competente o existencia de incidentes.</li>
                 </ul>
-                <p>Los plazos especificos de conservacion seran gestionados internamente conforme a la Politica de Retencion de Datos de la Cooperativa. Una vez cumplidos dichos plazos, sus datos personales seran eliminados o anonimizados de manera segura, conforme a la normativa vigente.</p>
+                <p>Los plazos específicos de conservación serán gestionados internamente conforme a la Política de Retención de Datos de la Cooperativa. Una vez cumplidos dichos plazos, sus datos personales serán eliminados o anonimizados de manera segura, conforme a la normativa vigente.</p>
 
                 <div class="section-title">9. Seguridad de los Datos Personales</div>
-                <p>La cooperativa implementara medidas tecnicas y organizativas para garantizar la seguridad y confidencialidad de sus datos personales, incluyendo:</p>
+                <p>La Cooperativa implementará medidas técnicas y organizativas para garantizar la seguridad y confidencialidad de sus datos personales, incluyendo:</p>
                 <ul class="list">
                     <li>Cifrado de datos.</li>
                     <li>Control de acceso restringido a personal autorizado.</li>
-                    <li>Auditorias periodicas de los sistemas de informacion.</li>
+                    <li>Auditorías periódicas de los sistemas de información.</li>
                 </ul>
             </section>
         </article>
@@ -432,34 +432,34 @@
             <img class="sheet-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
             <section class="content">
                 <div class="section-title">10. Consentimiento</div>
-                <p>El tratamiento de sus datos personales necesario para la gestion de la relacion contractual, evaluacion crediticia y cumplimiento de obligaciones legales no requiere su consentimiento, conforme a la normativa aplicable.</p>
-                <p>Usted podra otorgar o negar su consentimiento para las siguientes finalidades opcionales:</p>
+                <p>El tratamiento de sus datos personales necesario para la gestión de la relación contractual, evaluación crediticia y cumplimiento de obligaciones legales no requiere su consentimiento, conforme a la normativa aplicable.</p>
+                <p>Usted podrá otorgar o negar su consentimiento para las siguientes finalidades opcionales:</p>
                 <div class="consent-checks">
-                    <div class="check-row"><span class="box editable" contenteditable="true"></span><span>Envio de informacion comercial, promociones y ofertas de productos o servicios.</span></div>
-                    <div class="check-row"><span class="box editable" contenteditable="true"></span><span>Contacto a traves de medios electronicos, telefonicos o digitales.</span></div>
+                    <div class="check-row"><span class="box editable" contenteditable="true"></span><span>Envío de información comercial, promociones y ofertas de productos o servicios.</span></div>
+                    <div class="check-row"><span class="box editable" contenteditable="true"></span><span>Contacto a través de medios electrónicos, telefónicos o digitales.</span></div>
                     <div class="check-row"><span class="box editable" contenteditable="true"></span><span>Uso de imagen para fines publicitarios.</span></div>
                 </div>
-                <p>En caso de tratamiento de datos personales sensibles, se solicitara su consentimiento explicito de manera independiente cuando corresponda. La negativa a otorgar el consentimiento para finalidades no necesarias no afectara la prestacion de los servicios principales ofrecidos por la Cooperativa.</p>
+                <p>En caso de tratamiento de datos personales sensibles, se solicitara su consentimiento explícito de manera independiente cuando corresponda. La negativa a otorgar el consentimiento para finalidades no necesarias no afectará la prestación de los servicios principales ofrecidos por la Cooperativa.</p>
 
-                <div class="section-title">11. Revocacion del Consentimiento</div>
-                <p>Usted puede revocar su consentimiento en cualquier momento, presentando una solicitud por escrito al Responsable del Tratamiento de Datos Personales y al Delegado de Proteccion de Datos (DPO). La revocacion no tendra efectos retroactivos.</p>
+                <div class="section-title">11. Revocación del Consentimiento</div>
+                <p>Usted puede revocar su consentimiento en cualquier momento, presentando una solicitud por escrito al Responsable del Tratamiento de Datos Personales y al Delegado de Protección de Datos (DPO). La revocación no tendrá efectos retroactivos.</p>
 
-                <div class="section-title">12. Consecuencias de no Proporcionar los Datos</div>
-                <p>En caso de que decida no proporcionar sus datos personales o revocar su consentimiento, la Cooperativa no podra realizar los procesos que dependan de esos datos, lo que podria afectar la relacion comercial o contractual.</p>
+                <div class="section-title">12. Consecuencias de no proporcionar los Datos</div>
+                <p>En caso de que decida no proporcionar sus datos personales o revocar su consentimiento, la Cooperativa no podrá realizar los procesos que dependan de esos datos, lo que podría afectar la relación comercial o contractual.</p>
 
                 <div class="section-title">13. Reclamaciones ante la Autoridad de Control</div>
-                <p>Si considera que sus derechos han sido vulnerados, tiene derecho a presentar una reclamacion ante la Autoridad de Proteccion de Datos Personales del Ecuador.</p>
+                <p>Si considera que sus derechos han sido vulnerados, tiene derecho a presentar una reclamación ante la Autoridad de Protección de Datos Personales del Ecuador.</p>
 
-                <div class="section-title">Datos del titular y declaracion de consentimiento</div>
-                <p>El titular declara que ha leido, comprendido y aceptado el contenido del presente documento, y que ha otorgado su consentimiento de manera libre, especifica, informada e inequivoca conforme a las finalidades seleccionadas.</p>
+                <div class="section-title">Datos del titular y declaración de consentimiento</div>
+                <p>El titular declara que ha leído, comprendido y aceptado el contenido del presente documento, y que ha otorgado su consentimiento de manera libre, específica, informada e inequívoca conforme a las finalidades seleccionadas.</p>
 
                 <div class="section-title">Para personas naturales:</div>
                 <div class="two-columns">
                     <div class="data-lines">
                         <div class="data-line"><span class="line editable" contenteditable="true">{{ $fields['apellidos_nombres'] ?? '' }}</span><span class="line-label">Nombre del Titular:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $fields['cedula_identidad'] ?? '' }}</span><span class="line-label">Cedula de Identidad:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Correo electronico:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Telefono:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $fields['cedula_identidad'] ?? '' }}</span><span class="line-label">Cédula de identidad:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Correo electrónico:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Teléfono:</span></div>
                     </div>
                     <div class="data-lines">
                         <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Firma:</span></div>
@@ -467,15 +467,15 @@
                     </div>
                 </div>
 
-                <div class="section-title">Para personas Juridicas:</div>
+                <div class="section-title">Para personas jurídicas:</div>
                 <div class="two-columns">
                     <div class="data-lines">
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Razon social:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Razón social:</span></div>
                         <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">RUC:</span></div>
                         <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Nombre del representante legal:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Cedula del representante legal:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Correo electronico:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Telefono:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Cédula del representante legal:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Correo electrónico:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Teléfono:</span></div>
                     </div>
                     <div class="data-lines">
                         <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Firma del representante legal:</span></div>
@@ -483,7 +483,7 @@
                     </div>
                 </div>
 
-                <p style="margin-top: 5mm;">El firmante declara que, en caso de actuar en representacion de una persona juridica, cuenta con las facultades legales suficientes para otorgar el presente consentimiento en nombre de la misma.</p>
+                <p style="margin-top: 5mm;">El firmante declara que, en caso de actuar en representación de una persona jurídica, cuenta con las facultades legales suficientes para otorgar el presente consentimiento en nombre de esta..</p>
             </section>
         </article>
     </main>

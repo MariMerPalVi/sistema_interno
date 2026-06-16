@@ -16,7 +16,7 @@ class InternalDocumentPdfService
 
         $templateFile = public_path($template->template_path);
         if (!is_file($templateFile)) {
-            abort(404, 'No se encontro el formato PDF almacenado.');
+            abort(404, 'No se encontró el formato PDF almacenado.');
         }
 
         $pdf = new Fpdi();

@@ -37,8 +37,8 @@ class AutomatedReviewService
             'status' => $status,
             'score' => $score,
             'summary' => $status === 'aprobado'
-                ? 'Revision digital completada sin observaciones.'
-                : 'Revision digital completada con observaciones que deben corregirse.',
+                ? 'Revisión digital completada sin observaciones.'
+                : 'Revisión digital completada con observaciones que deben corregirse.',
             'findings' => $findings->all(),
             'reviewed_at' => now()->toISOString(),
         ];
@@ -49,7 +49,7 @@ class AutomatedReviewService
         $consent = $opening->consent;
 
         if (!$consent || !$consent->signed_file_path) {
-            return [$this->finding('error', 'Consentimiento', 'No se encontro consentimiento firmado cargado.')];
+            return [$this->finding('error', 'Consentimiento', 'No se encontró consentimiento firmado cargado.')];
         }
 
         if (!Storage::exists($consent->signed_file_path)) {
@@ -57,7 +57,7 @@ class AutomatedReviewService
         }
 
         if (!$consent->manual_signature_confirmed) {
-            return [$this->finding('error', 'Consentimiento', 'El consentimiento no tiene confirmacion de firma.')];
+            return [$this->finding('error', 'Consentimiento', 'El consentimiento no tiene confirmación de firma.')];
         }
 
         return [];
@@ -86,22 +86,22 @@ class AutomatedReviewService
             $findings = array_merge($findings, $this->reviewDocumentFile($document->display_name, $document));
 
             if ($document->status === 'rechazado') {
-                $findings[] = $this->finding('error', $document->display_name, 'El documento esta rechazado.');
+                $findings[] = $this->finding('error', $document->display_name, 'El documento está rechazado.');
             }
 
             $data = $document->extracted_data ?? [];
             if (in_array($requirement->type->slug, ['cedula-papeleta', 'cedula'], true)) {
                 if (blank($data['cedula'] ?? null)) {
-                    $findings[] = $this->finding('error', $document->display_name, 'No se detecto numero de cedula.');
+                    $findings[] = $this->finding('error', $document->display_name, 'No se detectó número de cédula.');
                 }
                 $name = $data['nombres_apellidos'] ?? trim(($data['nombres'] ?? '').' '.($data['apellidos'] ?? ''));
                 if (blank($name)) {
-                    $findings[] = $this->finding('warning', $document->display_name, 'No se detecto nombre y apellido.');
+                    $findings[] = $this->finding('warning', $document->display_name, 'No se detectó nombre y apellido.');
                 }
             }
 
             if ($requirement->type->slug === 'planilla-servicios' && blank($data['direccion'] ?? null)) {
-                $findings[] = $this->finding('warning', $document->display_name, 'No se detecto direccion en la planilla.');
+                $findings[] = $this->finding('warning', $document->display_name, 'No se detectó dirección en la planilla.');
             }
         }
 
@@ -130,11 +130,11 @@ class AutomatedReviewService
                 }
 
                 if ($evidence->result === 'pendiente') {
-                    $findings[] = $this->finding('error', $findingTitle, 'La linea de control sigue pendiente.');
+                    $findings[] = $this->finding('error', $findingTitle, 'La línea de control sigue pendiente.');
                 }
 
                 if ($evidence->result === 'con_observacion') {
-                    $findings[] = $this->finding('warning', $findingTitle, 'La consulta fue marcada con observacion.');
+                    $findings[] = $this->finding('warning', $findingTitle, 'La consulta fue marcada con observación.');
                 }
             }
         }
@@ -189,7 +189,7 @@ class AutomatedReviewService
             $findings = array_merge($findings, $this->reviewDocumentFile($document->display_name, $document));
 
             if ($template->requires_signature && !$document->manual_signature_confirmed) {
-                $findings[] = $this->finding('error', $template->name, 'Documento interno sin confirmacion de firma.');
+                $findings[] = $this->finding('error', $template->name, 'Documento interno sin confirmación de firma.');
             }
         }
 
@@ -238,7 +238,7 @@ class AutomatedReviewService
         }
 
         if (!in_array($document->status, ['cargado', 'validado'], true)) {
-            $findings[] = $this->finding('error', $label, 'El documento no esta en estado cargado o validado.');
+            $findings[] = $this->finding('error', $label, 'El documento no está en estado cargado o validado.');
         }
 
         return $findings;

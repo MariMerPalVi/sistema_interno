@@ -38,21 +38,35 @@ class AccountOpeningController extends Controller
 
     public function store(Request $request)
     {
+        $request->merge([
+            'file_name' => trim((string) $request->input('file_name')),
+        ]);
+
         $data = $request->validate([
             'account_type_id' => ['required', 'exists:account_types,id'],
-            'file_name' => ['required', 'string', 'max:120'],
+            'file_name' => [
+                'required',
+                'string',
+                'max:120',
+                Rule::unique('account_openings', 'file_name'),
+            ],
+        ], [
+            'file_name.unique' => 'Ya existe un expediente con este número o nombre en la cooperativa.',
         ]);
 
         $opening = DB::transaction(function () use ($data) {
             $publicCode = $this->makePublicCode();
             $fileName = trim($data['file_name']);
+            $agency = auth()->user()->agency;
+            $agencyFolder = config("opening.agencies.{$agency}.folder", $agency);
 
             $opening = AccountOpening::create([
                 'public_code' => $publicCode,
                 'file_name' => $fileName,
-                'storage_folder' => $this->safeFileNamePart($fileName),
+                'storage_folder' => $this->safeFileNamePart($agencyFolder).'/'.$this->safeFileNamePart($fileName),
+                'agency' => $agency,
                 'account_type_id' => $data['account_type_id'],
-                'created_by' => null,
+                'created_by' => auth()->id(),
                 'status' => 'borrador',
             ]);
 
@@ -61,7 +75,10 @@ class AccountOpeningController extends Controller
                 'template_path' => 'formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf',
             ]);
 
-            $this->audit($opening, 'crear_expediente', 'Expediente de apertura creado.');
+            $this->audit($opening, 'crear_expediente', 'Expediente de apertura creado.', [
+                'agency' => $agency,
+                'storage_folder' => $opening->storage_folder,
+            ]);
 
             return $opening;
         });
@@ -89,6 +106,7 @@ class AccountOpeningController extends Controller
             'companyExternalCheckApplicable' => $this->companyExternalCheckApplicable($opening),
             'consentDefaults' => $this->consentDocumentDefaults($opening),
             'documentDefaults' => $this->documentDownloadDefaults($opening),
+            'checklistRows' => $this->orderedChecklistRows($opening),
             'progress' => $this->calculateProgress($opening),
             'workflow' => $workflow,
             'activeStep' => $activeStep,
@@ -142,13 +160,13 @@ class AccountOpeningController extends Controller
             $opening,
             'actualizar_condicion_conyuge',
             $opening->requires_spouse_documents
-                ? 'Se marco que aplica documentacion de conyuge.'
-                : 'Se marco que no aplica documentacion de conyuge.'
+                ? 'Se marcó que aplica documentación de cónyuge.'
+                : 'Se marcó que no aplica documentación de cónyuge.'
         );
 
         return redirect()
             ->route('accounts.show', [$opening, 'paso' => 'requisitos'])
-            ->with('success', 'Condicion de conyuge actualizada.');
+            ->with('success', 'Condición de cónyuge actualizada.');
     }
 
     public function updateOptionalRequirements(Request $request, AccountOpening $opening)
@@ -179,9 +197,10 @@ class AccountOpeningController extends Controller
     {
         $data = $request->validate([
             'signed_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:'.self::MAX_FILE_KB],
-            'manual_signature_confirmed' => ['accepted'],
+            'manual_signature_confirmed' => ['required', 'accepted'],
             'observations' => ['nullable', 'string', 'max:500'],
         ], [
+            'manual_signature_confirmed.required' => 'Debe revisar visualmente el consentimiento y confirmar que contiene la firma.',
             'manual_signature_confirmed.accepted' => 'Debe confirmar manualmente que el consentimiento contiene firma.',
         ]);
 
@@ -206,6 +225,13 @@ class AccountOpeningController extends Controller
                 'observations' => $data['observations'] ?? null,
             ]
         );
+
+        $consentData = app(DocumentExtractionService::class)->extract(
+            'cedula',
+            $request->file('signed_file'),
+            config('opening.ocr_on_upload', false)
+        );
+        $this->syncMemberDataFromExtraction($opening, 'cedula', $consentData);
 
         $this->audit($opening, 'validar_consentimiento', 'Consentimiento firmado cargado y validado manualmente.');
 
@@ -243,7 +269,12 @@ class AccountOpeningController extends Controller
 
         $requirement = AccountTypeRequirement::with('type')->findOrFail($data['account_type_requirement_id']);
         $path = $this->storeFile($request->file('file'), $opening, 'requisitos', $requirement->file_name_pattern);
-        $extracted = app(DocumentExtractionService::class)->extract($requirement->type->slug, $request->file('file'));
+        $extracted = app(DocumentExtractionService::class)->extract(
+            $requirement->type->slug,
+            $request->file('file'),
+            config('opening.ocr_on_upload', false)
+                && in_array($requirement->type->slug, ['cedula', 'cedula-papeleta'], true)
+        );
         $this->syncMemberDataFromExtraction($opening, $requirement->type->slug, $extracted);
 
         UploadedDocument::updateOrCreate(
@@ -260,7 +291,7 @@ class AccountOpeningController extends Controller
                 'file_size' => $request->file('file')->getSize(),
                 'status' => $data['status'],
                 'extracted_data' => $extracted,
-                'uploaded_by' => null,
+                'uploaded_by' => auth()->id(),
             ]
         );
 
@@ -282,6 +313,12 @@ class AccountOpeningController extends Controller
 
     public function uploadExternalEvidence(Request $request, AccountOpening $opening)
     {
+        if (!$this->consentIsValid($opening)) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
+                ->withErrors('Debe cargar y validar el consentimiento firmado antes de continuar.');
+        }
+
         $data = $request->validate([
             'evidence_images' => ['nullable', 'array'],
             'evidence_images.*' => ['nullable', 'array'],
@@ -331,7 +368,7 @@ class AccountOpeningController extends Controller
                     $items,
                     $subjectImages,
                     $opening,
-                    "Revision listas de control {$subjectLabel}_{expediente}"
+                    "Revisión listas de control {$subjectLabel}_{expediente}"
                 )
                 : $existingPath;
 
@@ -352,7 +389,7 @@ class AccountOpeningController extends Controller
                         'result' => $data['results'][$subjectKey][$item->id] ?? 'pendiente',
                         'screenshot_path' => $path,
                         'advisor_observation' => $data['observations'][$subjectKey][$item->id] ?? null,
-                        'uploaded_by' => null,
+                        'uploaded_by' => auth()->id(),
                         'uploaded_at' => now(),
                     ]
                 );
@@ -386,7 +423,9 @@ class AccountOpeningController extends Controller
         }
 
         $data = array_merge(
-            $this->documentDownloadDefaults($opening),
+            $request->query('modo') === 'vacio'
+                ? $this->blankPersonalDocumentDefaults($opening)
+                : $this->documentDownloadDefaults($opening, true),
             $request->only([
                 'apellidos_nombres',
                 'cedula_identidad',
@@ -442,6 +481,12 @@ class AccountOpeningController extends Controller
 
     public function uploadInternalDocument(Request $request, AccountOpening $opening)
     {
+        if (!$this->consentIsValid($opening)) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
+                ->withErrors('Debe cargar y validar el consentimiento firmado antes de continuar.');
+        }
+
         $data = $request->validate([
             'internal_document_template_id' => ['required', 'exists:internal_document_templates,id'],
             'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:'.self::MAX_FILE_KB],
@@ -476,7 +521,7 @@ class AccountOpeningController extends Controller
                 'file_size' => $request->file('file')->getSize(),
                 'status' => $data['status'],
                 'manual_signature_confirmed' => true,
-                'uploaded_by' => null,
+                'uploaded_by' => auth()->id(),
             ]
         );
 
@@ -491,6 +536,12 @@ class AccountOpeningController extends Controller
 
     public function saveServices(Request $request, AccountOpening $opening)
     {
+        if (!$this->consentIsValid($opening)) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
+                ->withErrors('Debe cargar y validar el consentimiento firmado antes de continuar.');
+        }
+
         if (!$this->internalDocumentsAreComplete($opening)) {
             return redirect()
                 ->route('accounts.show', [$opening, 'paso' => 'internos'])
@@ -538,10 +589,14 @@ class AccountOpeningController extends Controller
         if (!$template->template_path) {
             return redirect()
                 ->route('accounts.show', [$opening, 'paso' => 'servicios'])
-                ->withErrors('El formato de este servicio aun esta pendiente de incorporar.');
+                ->withErrors('El formato de este servicio aún está pendiente de incorporar.');
         }
 
-        $data = array_merge($this->documentDownloadDefaults($opening), $request->only([
+        $data = array_merge(
+            $request->query('modo') === 'vacio'
+                ? $this->blankPersonalDocumentDefaults($opening)
+                : $this->documentDownloadDefaults($opening, true),
+            $request->only([
             'apellidos_nombres',
             'cedula_identidad',
             'cuenta_numero',
@@ -573,6 +628,12 @@ class AccountOpeningController extends Controller
 
     public function uploadServiceDocument(Request $request, AccountOpening $opening)
     {
+        if (!$this->consentIsValid($opening)) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
+                ->withErrors('Debe cargar y validar el consentimiento firmado antes de continuar.');
+        }
+
         $data = $request->validate([
             'internal_document_template_id' => ['required', 'exists:internal_document_templates,id'],
             'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:'.self::MAX_FILE_KB],
@@ -608,7 +669,7 @@ class AccountOpeningController extends Controller
                 'file_size' => $request->file('file')->getSize(),
                 'status' => $data['status'],
                 'manual_signature_confirmed' => true,
-                'uploaded_by' => null,
+                'uploaded_by' => auth()->id(),
             ]
         );
 
@@ -664,7 +725,7 @@ class AccountOpeningController extends Controller
         if (!$this->readyToSubmit($opening)) {
             return redirect()
                 ->route('accounts.show', [$opening, 'paso' => $this->workflowState($opening)['current']])
-                ->withErrors('El expediente aun tiene requisitos obligatorios pendientes.');
+                ->withErrors('El expediente aún tiene requisitos obligatorios pendientes.');
         }
 
         $result = app(AutomatedReviewService::class)->review($opening);
@@ -778,7 +839,7 @@ class AccountOpeningController extends Controller
         ));
     }
 
-    private function documentDownloadDefaults(AccountOpening $opening): array
+    private function documentDownloadDefaults(AccountOpening $opening, bool $detectMissingIdentity = false): array
     {
         $opening->loadMissing(['documents', 'accountType']);
 
@@ -787,6 +848,7 @@ class AccountOpeningController extends Controller
             ->pluck('extracted_data')
             ->filter()
             ->first(fn ($data) => filled($data['cedula'] ?? null) || filled($data['nombres_apellidos'] ?? null));
+        $cedulaData = $this->bestAvailableIdentityData($opening, $cedulaData, $detectMissingIdentity);
 
         $planillaData = $opening->documents
             ->where('document_scope', 'requisito')
@@ -815,6 +877,97 @@ class AccountOpeningController extends Controller
             'tipo_solicitante' => 'socio',
             'fondo_mortuorio' => 'no',
         ];
+    }
+
+    private function blankPersonalDocumentDefaults(AccountOpening $opening): array
+    {
+        $opening->loadMissing('accountType');
+
+        return [
+            'apellidos_nombres' => '',
+            'cedula_identidad' => '',
+            'nacionalidad' => '',
+            'direccion' => '',
+            'codigo_socio' => $opening->file_name,
+            'cuenta_numero' => $opening->file_name,
+            'tipo_cuenta' => $opening->accountType->name,
+            'ciudad' => 'Las Naves',
+            'dia' => now()->format('d'),
+            'mes' => now()->locale('es')->translatedFormat('F'),
+            'anio' => now()->format('Y'),
+            'tipo_solicitante' => 'socio',
+            'fondo_mortuorio' => 'no',
+        ];
+    }
+
+    private function bestAvailableIdentityData(AccountOpening $opening, ?array $currentData, bool $detectMissingIdentity = false): array
+    {
+        $currentData ??= [];
+        $hasIdentification = strlen(preg_replace('/\D+/', '', (string) ($currentData['cedula'] ?? ''))) === 10;
+        $hasName = $this->isPlausiblePersonName($this->singleLine($currentData['nombres_apellidos'] ?? ''));
+
+        if ($hasIdentification && $hasName) {
+            return $currentData;
+        }
+
+        if (!$detectMissingIdentity && !config('opening.rescan_stored_documents', false)) {
+            return $currentData;
+        }
+
+        $storedCandidates = $opening->documents
+            ->where('document_scope', 'requisito')
+            ->sortByDesc(fn ($document) => str_contains(mb_strtolower($document->display_name ?? ''), 'cédula')
+                || str_contains(mb_strtolower($document->display_name ?? ''), 'cedula'))
+            ->map(fn ($document) => [
+                'path' => $document->file_path,
+                'name' => $document->original_name,
+                'mime' => $document->mime_type,
+            ]);
+
+        if ($opening->consent?->signed_file_path) {
+            $storedCandidates->push([
+                'path' => $opening->consent->signed_file_path,
+                'name' => basename($opening->consent->signed_file_path),
+                'mime' => null,
+            ]);
+        }
+
+        foreach ($storedCandidates as $candidate) {
+            if (!Storage::exists($candidate['path'])) {
+                continue;
+            }
+
+            $file = new UploadedFile(
+                Storage::path($candidate['path']),
+                $candidate['name'] ?: basename($candidate['path']),
+                $candidate['mime'],
+                null,
+                true
+            );
+            $extracted = app(DocumentExtractionService::class)->extract(
+                'cedula',
+                $file,
+                $detectMissingIdentity
+                    ? config('opening.ocr_on_demand', true)
+                    : config('opening.ocr_on_upload', false)
+            );
+
+            foreach (['cedula', 'nombres_apellidos', 'nacionalidad'] as $field) {
+                if (blank($currentData[$field] ?? null) && filled($extracted[$field] ?? null)) {
+                    $currentData[$field] = $extracted[$field];
+                }
+            }
+
+            $hasIdentification = strlen(preg_replace('/\D+/', '', (string) ($currentData['cedula'] ?? ''))) === 10;
+            $hasName = $this->isPlausiblePersonName($this->singleLine($currentData['nombres_apellidos'] ?? ''));
+            if ($hasIdentification && $hasName) {
+                break;
+            }
+        }
+
+        $this->syncMemberDataFromExtraction($opening, 'cedula', $currentData);
+
+        return $currentData;
     }
 
     private function isBdhTemplate(InternalDocumentTemplate $template): bool
@@ -1115,7 +1268,7 @@ class AccountOpeningController extends Controller
 
         $name = strtolower($file->getClientOriginalName());
         if (str_contains($name, 'sin_firma') || str_contains($name, 'sin-firma') || str_contains($name, 'no_firmado')) {
-            return 'El nombre del archivo indica que el consentimiento no esta firmado. Cargue el documento firmado para continuar.';
+            return 'El nombre del archivo indica que el consentimiento no está firmado. Cargue el documento firmado para continuar.';
         }
 
         return null;
@@ -1133,8 +1286,8 @@ class AccountOpeningController extends Controller
                 'nacionalidad' => $opening->member_nationality,
             ],
             'papeleta-votacion' => $base + [
-                'ultima_eleccion' => 'Validacion manual contra CNE requerida',
-                'alerta' => 'Confirmar que corresponda a la ultima eleccion disponible.',
+                'ultima_eleccion' => 'Validación manual contra CNE requerida',
+                'alerta' => 'Confirmar que corresponda a la última elección disponible.',
             ],
             'planilla-servicios' => $base + [
                 'direccion' => $opening->member_address,
@@ -1144,7 +1297,7 @@ class AccountOpeningController extends Controller
                 'ruc' => null,
                 'razon_social' => 'Pendiente de OCR',
             ],
-            default => $base + ['legibilidad' => 'Validacion manual requerida'],
+            default => $base + ['legibilidad' => 'Validación manual requerida'],
         };
     }
 
@@ -1173,7 +1326,13 @@ class AccountOpeningController extends Controller
     private function consentIsValid(AccountOpening $opening): bool
     {
         $consent = $opening->consent()->first();
-        return $consent && $consent->signed_file_path && $consent->manual_signature_confirmed;
+
+        return $consent
+            && $consent->status === 'validado'
+            && $consent->signed_file_path
+            && Storage::exists($consent->signed_file_path)
+            && $consent->manual_signature_confirmed
+            && $consent->validated_at;
     }
 
     private function requiredDocumentsAreValid(AccountOpening $opening): bool
@@ -1299,6 +1458,142 @@ class AccountOpeningController extends Controller
         ];
     }
 
+    private function orderedChecklistRows(AccountOpening $opening): array
+    {
+        $opening->loadMissing(['accountType.requirements.type', 'documents', 'consent', 'externalEvidences', 'histories']);
+
+        $requirements = $opening->accountType->requirements;
+        $requirementDocs = $opening->documents
+            ->where('document_scope', 'requisito')
+            ->keyBy('account_type_requirement_id');
+        $internalTemplates = $this->internalTemplatesForOpening($opening)->get();
+        $internalDocs = $opening->documents
+            ->where('document_scope', 'interno')
+            ->keyBy('internal_document_template_id');
+        $serviceTemplates = $this->serviceDocumentTemplates()->get();
+        $serviceDocs = $opening->documents
+            ->where('document_scope', 'servicio')
+            ->keyBy('internal_document_template_id');
+
+        $rows = [];
+        $add = function (string $name, ?string $path, string $category = 'Documento', ?bool $loaded = null) use (&$rows): void {
+            $rows[] = [
+                'name' => $name,
+                'path' => $path,
+                'category' => $category,
+                'loaded' => $loaded ?? (filled($path) && Storage::exists($path)),
+            ];
+        };
+        $addRequirement = function (callable $match, ?string $label = null) use ($requirements, $requirementDocs, $add): void {
+            $requirement = $requirements->first($match);
+            if (!$requirement) {
+                return;
+            }
+
+            $document = $requirementDocs->get($requirement->id);
+            $add($label ?: $requirement->label, $document?->file_path, 'Requisito');
+        };
+        $addInternal = function (
+            string $needle,
+            ?string $label = null,
+            bool $includeOptionalWhenEmpty = false,
+            string $fallbackSource = 'sistema'
+        ) use ($internalTemplates, $internalDocs, $add): void {
+            $template = $internalTemplates->first(fn ($item) => str_contains(mb_strtolower($item->name), mb_strtolower($needle)));
+            if (!$template) {
+                $add(($label ?: $needle)." ({$fallbackSource})", null, 'Interno');
+                return;
+            }
+
+            $document = $internalDocs->get($template->id);
+            if (!$template->is_required && !$includeOptionalWhenEmpty && !$document?->file_path) {
+                return;
+            }
+
+            $source = $template->source === 'manual' ? 'manual' : 'sistema';
+            $add(($label ?: $template->name)." ({$source})", $document?->file_path, 'Interno');
+        };
+
+        $identityRequirements = $requirements
+            ->filter(fn ($requirement) => in_array($requirement->type->slug, ['cedula-papeleta', 'cedula', 'cedula-menor', 'documentos-conyuge'], true))
+            ->sortBy(fn ($requirement) => match ($requirement->type->slug) {
+                'cedula-papeleta', 'cedula' => 1,
+                'cedula-menor', 'documentos-conyuge' => 2,
+                default => 9,
+            });
+
+        foreach ($identityRequirements as $requirement) {
+            if ($requirement->type->slug === 'documentos-conyuge' && !$opening->requires_spouse_documents) {
+                continue;
+            }
+
+            $document = $requirementDocs->get($requirement->id);
+            $add($requirement->label, $document?->file_path, 'Identificación');
+        }
+
+        $addInternal('formulario solicitud apertura', 'Formulario solicitud apertura de cuenta/actualización de datos');
+        $addInternal('formulario conozca a su cliente / socio', 'Formulario conozca a su cliente / socio');
+        $addInternal('solicitud de ingreso al consejo', 'Solicitud de ingreso al consejo de administración', false, 'manual');
+        $add(
+            'Consentimiento para el Tratamiento de Datos Personales',
+            $opening->consent?->signed_file_path,
+            'Consentimiento'
+        );
+        $addInternal('contrato de apertura', 'Contrato de apertura de cuenta de ahorros');
+        $addInternal('autocertificación residencia fiscal', 'Formulario autocertificación residencia fiscal');
+        $add(
+            'Revisión de listas de control (manual)',
+            $opening->externalEvidences->firstWhere('screenshot_path', '!=', null)?->screenshot_path,
+            'Consulta externa'
+        );
+
+        if ($opening->accountType->slug === 'cuenta-juridica') {
+            foreach ([
+                ['ruc', 'RUC'],
+                ['planilla-servicios', 'Planilla de servicio básico de la institución'],
+                ['planilla-servicios', 'Planilla de servicio básico del representante legal'],
+                ['nombramiento', 'Nombramiento'],
+                ['estatutos', 'Estatuto'],
+                ['estados-financieros', 'Estados financieros'],
+                ['declaracion-renta', 'Pago de impuesto a la renta del año inmediato anterior'],
+                ['poder-autorizacion', 'Poder para trámite por tercero (si aplica)'],
+                ['acta-constitucion', 'Acta notariada de constitución de la sociedad (si aplica)'],
+            ] as [$slug, $label]) {
+                $addRequirement(
+                    fn ($requirement) => $requirement->type->slug === $slug
+                        && ($slug !== 'planilla-servicios' || $requirement->label === $label),
+                    $label
+                );
+            }
+
+            $addInternal('conozca su cliente - jurídica', 'Formulario conozca a su cliente - jurídica', false, 'manual');
+            $addInternal('conozca su cliente - representante legal', 'Formulario conozca a su cliente - representante legal', false, 'manual');
+        } else {
+            $addRequirement(
+                fn ($requirement) => $requirement->type->slug === 'planilla-servicios',
+                'Planilla de servicio básico'
+            );
+
+            $serviceTemplate = $serviceTemplates->first(fn ($template) => in_array(
+                $template->slug,
+                $this->requiredServiceTemplateSlugs($opening)->all(),
+                true
+            ));
+            if ($serviceTemplate) {
+                $add($serviceTemplate->name, $serviceDocs->get($serviceTemplate->id)?->file_path, 'Servicio');
+            }
+        }
+
+        $addInternal('registro de firmas', 'Registro de firmas', false, 'manual');
+        $add('Check List', null, 'Control', true);
+
+        if ($opening->accountType->slug === 'cuenta-basica') {
+            $addInternal('autorización para acreditación del bdh', 'Autorización para acreditación del BDH', true, 'manual');
+        }
+
+        return $rows;
+    }
+
     private function fondoMortuorioDecision(AccountOpening $opening): ?string
     {
         return data_get($opening->histories()
@@ -1403,7 +1698,7 @@ class AccountOpeningController extends Controller
     {
         ActionHistory::create([
             'account_opening_id' => $opening->id,
-            'user_id' => null,
+            'user_id' => auth()->id(),
             'action' => $action,
             'description' => $description,
             'metadata' => $metadata,

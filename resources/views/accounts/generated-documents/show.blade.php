@@ -995,8 +995,8 @@
             </table>
 
             <p class="notice">
-                Estimado(s) firmante(s), le(s) informamos que esta firma se actualizara de forma automatica en todas las cuenta de ahorro donde usted(es) esten registrado(s) como firma autorizada.
-                Por lo tanto <strong>COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES</strong> devolvera los retiros/transferencias/notas de débito u otro medio de pago cuya firma no corresponda a esta actualizacion.
+                Estimado(s) firmante(s), le(s) informamos que esta firma se actualizará de forma automática en todas las cuentas de ahorro donde usted(es) estén registrado(s) como firma autorizada.
+                Por lo tanto, <strong>COOPERATIVA DE AHORRO Y CRÉDITO LAS NAVES</strong> devolverá los retiros, transferencias, notas de débito u otro medio de pago cuya firma no corresponda a esta actualización.
             </p>
             <p class="exclusive">PARA USO EXCLUSIVO DE LA COOPERATIVA</p>
             <table class="firm-table">
@@ -1185,7 +1185,7 @@
                 </section>
             </section>
         @elseif ($isBdh)
-            <section class="bdh-document" aria-label="Autorizacion BDH editable">
+            <section class="bdh-document" aria-label="Autorización BDH editable">
                 <img class="bdh-logo" src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
 
                 <div class="bdh-account-row">
@@ -1365,12 +1365,12 @@
             <section class="generic-box">
                 <div class="generic-row"><strong>Expediente</strong><span contenteditable="true">{{ $opening->file_name }}</span></div>
                 <div class="generic-row"><strong>Apellidos y nombres</strong><span contenteditable="true">{{ $fullName }}</span></div>
-                <div class="generic-row"><strong>Cedula de identidad</strong><span contenteditable="true">{{ $identification }}</span></div>
+                <div class="generic-row"><strong>Cédula de identidad</strong><span contenteditable="true">{{ $identification }}</span></div>
                 <div class="generic-row"><strong>Tipo de cuenta</strong><span contenteditable="true">{{ $accountType }}</span></div>
-                <div class="generic-row"><strong>Cuenta numero</strong><span contenteditable="true">{{ $accountNumber }}</span></div>
+                <div class="generic-row"><strong>Número de cuenta</strong><span contenteditable="true">{{ $accountNumber }}</span></div>
                 <div class="generic-row"><strong>Fecha</strong><span contenteditable="true">{{ $day }} de {{ $month }} del {{ $year }}</span></div>
                 @if ($isBdh)
-                    <div class="generic-row"><strong>Direccion</strong><span contenteditable="true">{{ $fields['direccion'] ?? '' }}</span></div>
+                    <div class="generic-row"><strong>Dirección</strong><span contenteditable="true">{{ $fields['direccion'] ?? '' }}</span></div>
                 @endif
                 <div class="signature">
                     <span>SOLICITANTE</span>

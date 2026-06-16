@@ -16,8 +16,19 @@
             </span>
         </a>
         <div class="session">
-            <span>Asesor Demo</span>
-            <span class="pill">Rol: Asesor</span>
+            <span class="session-user">
+                <strong>{{ auth()->user()->name }}</strong>
+                <small>{{ auth()->user()->role->label }}</small>
+            </span>
+            <a class="icon-button" href="{{ route('password.edit') }}" title="Cambiar contraseña" aria-label="Cambiar contraseña">
+                <i data-lucide="key-round"></i>
+            </a>
+            <form method="post" action="{{ route('logout') }}">
+                @csrf
+                <button class="icon-button" type="submit" title="Cerrar sesión" aria-label="Cerrar sesión">
+                    <i data-lucide="log-out"></i>
+                </button>
+            </form>
         </div>
     </header>
 

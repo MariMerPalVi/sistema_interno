@@ -6,7 +6,7 @@
     $serviceDocs = $opening->documents->where('document_scope', 'servicio')->keyBy('internal_document_template_id');
     $externalDocs = $opening->externalEvidences->keyBy(fn ($evidence) => $evidence->subject_key.'_'.$evidence->external_check_item_id);
     $selectedServices = $opening->services->pluck('additional_service_id')->all();
-    $consentComplete = $opening->consent?->signed_file_path && $opening->consent?->manual_signature_confirmed;
+    $consentComplete = $workflow['complete']['consentimiento'];
     $spouseRequirementIds = $opening->accountType->requirements->filter(fn ($requirement) => $requirement->type->slug === 'documentos-conyuge')->pluck('id');
     $optionalRequirements = $opening->accountType->requirements->where('is_required', false)->reject(fn ($requirement) => $requirement->type->slug === 'documentos-conyuge');
     $optionalSelectionHistory = $opening->histories->where('action', 'seleccionar_requisitos_opcionales')->sortByDesc('id')->first();
@@ -67,6 +67,7 @@
     ];
     $storageRoot = storage_path('app/private');
     $expedientStoragePath = $storageRoot.DIRECTORY_SEPARATOR.'aperturas'.DIRECTORY_SEPARATOR.str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $opening->storage_folder);
+    $agencyName = config("opening.agencies.{$opening->agency}.name", $opening->agency ?: 'Agencia no registrada');
     $documentStoragePath = fn (?string $path) => $path
         ? $storageRoot.DIRECTORY_SEPARATOR.str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path)
         : null;
@@ -79,7 +80,10 @@
         <div>
             <p class="eyebrow">{{ $opening->public_code }}</p>
             <h1>{{ $opening->accountType->name }}</h1>
-            <span class="hint">{{ $opening->file_name }}</span>
+            <div class="opening-meta">
+                <span class="hint">{{ $opening->file_name }}</span>
+                <span class="agency-label"><i data-lucide="building-2"></i> {{ $agencyName }}</span>
+            </div>
         </div>
         <span class="status">{{ str_replace('_', ' ', $opening->status) }}</span>
     </section>
@@ -106,18 +110,25 @@
     @if ($activeStep === 'consentimiento')
     <section id="consentimiento" class="panel">
         <div class="panel-head">
-            <h2>Consentimiento de datos personales</h2>
+            <h2 class="panel-title"><i data-lucide="shield-check"></i> Consentimiento de datos personales</h2>
             @include('partials.badge', ['status' => optional($opening->consent)->status ?? 'pendiente'])
         </div>
-        <p>Abra el consentimiento editable, complete los datos directamente en el formato institucional, imprimalo, obtenga la firma del socio y cargue el documento firmado.</p>
-        <div class="toolbar">
-            <a class="button secondary" href="{{ route('accounts.consent.edit', $opening) }}" target="_blank">Abrir consentimiento editable</a>
-            <a class="button ghost" href="{{ asset('formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf') }}" target="_blank">Ver formato original</a>
+        <div class="step-guidance">
+            <i data-lucide="clipboard-check"></i>
+            <span>Abra el consentimiento editable, complete los datos, imprímalo y solicite la firma. Luego cargue el archivo firmado, marque <strong>Firma revisada</strong> y presione <strong>Subir y validar</strong>.</span>
         </div>
-        <div class="toolbar">
+        <div class="consent-actions" aria-label="Acciones del consentimiento">
+            <a class="doc-action" href="{{ route('accounts.consent.edit', $opening) }}" target="_blank" aria-label="Editar consentimiento" data-tooltip="Editar consentimiento">
+                <i data-lucide="file-pen-line"></i>
+            </a>
+            <a class="doc-action" href="{{ asset('formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf') }}" target="_blank" aria-label="Ver formato original" data-tooltip="Ver formato original">
+                <i data-lucide="file-search"></i>
+            </a>
             @if ($consentComplete)
-                <a class="button ghost" href="{{ route('accounts.consent.preview', $opening) }}" target="_blank">Previsualizar documento cargado</a>
-                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'requisitos']) }}">Continuar</a>
+                <a class="doc-action" href="{{ route('accounts.consent.preview', $opening) }}" target="_blank" aria-label="Previsualizar documento cargado" data-tooltip="Previsualizar documento cargado">
+                    <i data-lucide="eye"></i>
+                </a>
+                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'requisitos']) }}">Continuar <i data-lucide="arrow-right"></i></a>
             @endif
         </div>
         @if ($consentComplete)
@@ -128,9 +139,12 @@
         <form class="upload-row" method="post" enctype="multipart/form-data" action="{{ route('accounts.consent.upload', $opening) }}">
             @csrf
             <input type="file" name="signed_file" accept=".pdf,.jpg,.jpeg,.png" required>
-            <label class="check"><input type="checkbox" name="manual_signature_confirmed" value="1" required> Firma verificada manualmente</label>
-            <input name="observations" placeholder="Observacion opcional">
-            <button class="button primary" type="submit">Subir y validar</button>
+            <label class="check consent-signature-check" title="Confirme que revisó visualmente la firma">
+                <input type="checkbox" name="manual_signature_confirmed" value="1" required>
+                Firma revisada
+            </label>
+            <input name="observations" placeholder="Observación">
+            <button class="button primary" type="submit"><i data-lucide="upload"></i> Subir y validar</button>
         </form>
     </section>
     @endif
@@ -139,16 +153,16 @@
     <section id="requisitos" class="panel">
         <div class="panel-head">
             <h2>Requisitos del tipo de cuenta</h2>
-            <span class="hint">PDF, JPG o PNG. Maximo 5 MB por archivo.</span>
+            <span class="hint">PDF, JPG o PNG. Máximo 5 MB por archivo.</span>
         </div>
         @if ($spouseRequirementIds->isNotEmpty())
             <form class="inline-choice" method="post" action="{{ route('accounts.spouse.update', $opening) }}">
                 @csrf
                 <label class="check">
                     <input type="checkbox" name="requires_spouse_documents" value="1" @checked($opening->requires_spouse_documents)>
-                    El socio es casado o mantiene union de hecho y requiere documentos del conyuge
+                    El socio es casado o mantiene unión de hecho y requiere documentos del cónyuge
                 </label>
-                <button class="button secondary" type="submit">Guardar condicion</button>
+                <button class="button secondary" type="submit"><i data-lucide="save"></i> Guardar condición</button>
             </form>
         @endif
         @if ($optionalRequirements->isNotEmpty())
@@ -161,7 +175,7 @@
                         {{ $optionalRequirement->label }}
                     </label>
                 @endforeach
-                <button class="button secondary" type="submit">Guardar selección</button>
+                <button class="button secondary" type="submit"><i data-lucide="save"></i> Guardar selección</button>
             </form>
         @endif
         <div class="checklist">
@@ -178,7 +192,7 @@
                         <h3>{{ $requirement->label }}</h3>
                         <p>{{ $requirement->type->validation_rules }}</p>
                         @if ($requirement->file_name_pattern)
-                            <p class="hint">Se guardara como: {{ str_replace('{expediente}', $opening->file_name, $requirement->file_name_pattern) }}</p>
+                            <p class="hint">Se guardará como: {{ str_replace('{expediente}', $opening->file_name, $requirement->file_name_pattern) }}</p>
                         @endif
                         @include('partials.badge', ['status' => $doc->status ?? 'pendiente'])
                         @if ($doc?->extracted_data)
@@ -187,15 +201,15 @@
                                 $name = $data['nombres_apellidos'] ?? trim(($data['nombres'] ?? '').' '.($data['apellidos'] ?? ''));
                                 $fields = match ($requirement->type->slug) {
                                     'cedula-papeleta', 'cedula' => [
-                                        'Numero de cedula' => $data['cedula'] ?? null,
+                                        'Número de cédula' => $data['cedula'] ?? null,
                                         'Nombre y apellido' => $name ?: null,
                                     ],
                                     'planilla-servicios' => [
-                                        'Direccion' => $data['direccion'] ?? null,
+                                        'Dirección' => $data['direccion'] ?? null,
                                     ],
                                     'ruc' => [
                                         'RUC' => $data['ruc'] ?? null,
-                                        'Razon social' => $data['razon_social'] ?? null,
+                                        'Razón social' => $data['razon_social'] ?? null,
                                     ],
                                     default => [],
                                 };
@@ -222,15 +236,15 @@
                             <option value="validado">Validado</option>
                             <option value="rechazado">Rechazado</option>
                         </select>
-                        <input name="observations" placeholder="Observacion si aplica">
-                        <button class="button secondary" type="submit">{{ $doc ? 'Reemplazar' : 'Subir' }}</button>
+                        <input name="observations" placeholder="Observación si aplica">
+                        <button class="button secondary" type="submit"><i data-lucide="{{ $doc ? 'refresh-cw' : 'upload' }}"></i> {{ $doc ? 'Reemplazar' : 'Subir' }}</button>
                     </form>
                 </article>
             @endforeach
         </div>
         @if ($requirementsComplete)
             <div class="actions">
-                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'externas']) }}">Continuar</a>
+                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'externas']) }}">Continuar <i data-lucide="arrow-right"></i></a>
             </div>
         @endif
     </section>
@@ -239,7 +253,7 @@
     @if ($activeStep === 'externas')
     <section id="externas" class="panel">
         <div class="panel-head">
-            <h2>Lista de control externa</h2>
+            <h2 class="panel-title"><i data-lucide="shield-check"></i> Lista de control externa</h2>
             <span class="hint">Pegue una evidencia por consulta. El sistema guardará un PDF consolidado por cada persona o entidad revisada.</span>
         </div>
         <form class="external-evidence-form" method="post" action="{{ route('accounts.external.upload', $opening) }}">
@@ -261,7 +275,7 @@
             @foreach ($displaySubjects as $subjectKey => $subjectLabel)
                 <section class="external-subject" data-external-subject="{{ $subjectKey }}" @hidden($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
                     <div class="external-subject-head">
-                        <h3>Revisión: {{ $subjectLabel }}</h3>
+                        <h3 class="subject-title"><i data-lucide="{{ $subjectKey === 'empresa' ? 'building-2' : 'user-round-check' }}"></i> Revisión: {{ $subjectLabel }}</h3>
                         <span>Las cuatro evidencias se guardarán en un PDF consolidado.</span>
                     </div>
                     <div class="external-grid">
@@ -269,7 +283,9 @@
                             @php $evidence = $externalDocs->get($subjectKey.'_'.$item->id); @endphp
                             <div>
                                 <h3>{{ $item->name }}</h3>
-                                <a href="{{ $item->url }}" target="_blank" rel="noopener">Abrir enlace oficial</a>
+                                <a class="doc-action external-link-action" href="{{ $item->url }}" target="_blank" rel="noopener" aria-label="Abrir enlace oficial" data-tooltip="Abrir enlace oficial">
+                                    <i data-lucide="external-link"></i>
+                                </a>
                                 @include('partials.badge', ['status' => $evidence?->screenshot_path ? $evidence->result : 'pendiente'])
                                 <select name="results[{{ $subjectKey }}][{{ $item->id }}]" @disabled($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
                                     <option value="sin_novedad" @selected(($evidence?->result ?? null) === 'sin_novedad')>Sin novedad</option>
@@ -280,7 +296,8 @@
                                 <input name="observations[{{ $subjectKey }}][{{ $item->id }}]" value="{{ $evidence?->advisor_observation }}" placeholder="Observación del asesor" @disabled($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
                                 <input type="hidden" name="evidence_images[{{ $subjectKey }}][{{ $item->id }}]" class="pasted-evidence-input" data-has-evidence="{{ $evidence?->screenshot_path ? '1' : '0' }}" @required(!$evidence?->screenshot_path) @disabled($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
                                 <div class="paste-capture compact-paste" tabindex="0">
-                                    <span>{{ $evidence?->screenshot_path ? 'Pegar nueva evidencia para reemplazar' : 'Pegar evidencia con Ctrl + V' }}</span>
+                                    <i data-lucide="clipboard-paste" aria-hidden="true"></i>
+                                    <span>{{ $evidence?->screenshot_path ? 'Pegar evidencia para reemplazar' : 'Pegar evidencia con Ctrl + V' }}</span>
                                     <img alt="Vista previa de la evidencia pegada" hidden>
                                 </div>
                             </div>
@@ -289,12 +306,12 @@
                 </section>
             @endforeach
             <div class="actions">
-                <button class="button secondary" type="submit">{{ $externalComplete ? 'Actualizar evidencias' : 'Guardar evidencias' }}</button>
+                <button class="button secondary" type="submit"><i data-lucide="{{ $externalComplete ? 'refresh-cw' : 'clipboard-check' }}"></i> {{ $externalComplete ? 'Actualizar evidencias' : 'Guardar evidencias' }}</button>
             </div>
         </form>
         @if ($externalComplete)
             <div class="actions">
-                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'internos']) }}">Continuar</a>
+                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'internos']) }}">Continuar <i data-lucide="arrow-right"></i></a>
             </div>
         @endif
     </section>
@@ -304,7 +321,12 @@
     <section id="internos" class="panel">
         <div class="panel-head">
             <h2>Documentos internos</h2>
-            <span class="hint">Documentos manuales y documentos generados desde Econx.</span>
+            <span class="hint">Documentos manuales y documentos generados desde el sistema.</span>
+        </div>
+        <div class="doc-action-legend" aria-label="Acciones disponibles">
+            <span><i data-lucide="sparkles"></i> Detectar datos</span>
+            <span><i data-lucide="file-pen-line"></i> Vacío editable</span>
+            <span><i data-lucide="file-search"></i> Original</span>
         </div>
         <div class="checklist">
             @foreach ($internalTemplates as $template)
@@ -315,22 +337,33 @@
                         <span class="status">{{ match ($template->source) {
                             'manual' => 'MANUAL / EDITABLE',
                             'sistema' => 'SISTEMA',
-                            default => 'ECONX',
+                            default => 'SISTEMA',
                         } }}</span>
                         @if ($template->source === 'manual' && $template->template_path)
                             <div class="doc-actions">
-                                <a href="{{ route('accounts.internal.generate', [$opening, $template]) }}" target="_blank">Abrir documento editable</a>
-                                <a href="{{ route('accounts.internal.original', [$opening, $template]) }}" target="_blank">Ver documento original</a>
+                                <a class="doc-action" href="{{ route('accounts.internal.generate', [$opening, $template]) }}" target="_blank" aria-label="Detectar datos y abrir" data-tooltip="Detectar datos y abrir">
+                                    <i data-lucide="sparkles"></i>
+                                </a>
+                                <a class="doc-action" href="{{ route('accounts.internal.generate', [$opening, $template, 'modo' => 'vacio']) }}" target="_blank" aria-label="Abrir documento vacío" data-tooltip="Abrir documento vacío">
+                                    <i data-lucide="file-pen-line"></i>
+                                </a>
+                                <a class="doc-action" href="{{ route('accounts.internal.original', [$opening, $template]) }}" target="_blank" aria-label="Ver documento original" data-tooltip="Ver documento original">
+                                    <i data-lucide="file-search"></i>
+                                </a>
                             </div>
                         @elseif ($template->source === 'manual')
                             <span class="hint">Formato manual editable pendiente de adjuntar</span>
                         @elseif ($template->template_path)
-                            <a href="{{ route('accounts.internal.original', [$opening, $template]) }}" target="_blank">Ver documento original</a>
+                            <div class="doc-actions">
+                                <a class="doc-action" href="{{ route('accounts.internal.original', [$opening, $template]) }}" target="_blank" aria-label="Ver documento original" data-tooltip="Ver documento original">
+                                    <i data-lucide="file-search"></i>
+                                </a>
+                            </div>
                         @else
-                            <span class="hint">{{ $template->source === 'sistema' ? 'Documento generado por el sistema' : 'Documento obtenido del ECONX' }}</span>
+                            <span class="hint">Documento generado por el sistema</span>
                         @endif
                         @if ($template->file_name_pattern)
-                            <p class="hint">Se guardara como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>
+                            <p class="hint">Se guardará como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>
                         @endif
                         @include('partials.badge', ['status' => $doc->status ?? 'pendiente'])
                     </div>
@@ -344,14 +377,14 @@
                             <option value="validado">Validado</option>
                             <option value="rechazado">Rechazado</option>
                         </select>
-                        <button class="button secondary" type="submit">{{ $doc ? 'Reemplazar' : 'Subir' }}</button>
+                        <button class="button secondary" type="submit"><i data-lucide="{{ $doc ? 'refresh-cw' : 'upload' }}"></i> {{ $doc ? 'Reemplazar' : 'Subir' }}</button>
                     </form>
                 </article>
             @endforeach
         </div>
         @if ($internalComplete)
             <div class="actions">
-                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'servicios']) }}">Continuar</a>
+                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'servicios']) }}">Continuar <i data-lucide="arrow-right"></i></a>
             </div>
         @endif
     </section>
@@ -361,7 +394,7 @@
     <section id="servicios" class="panel">
         <div class="panel-head">
             <h2>Servicios adicionales</h2>
-            <span class="hint">La seleccion queda registrada en el expediente.</span>
+            <span class="hint">La selección queda registrada en el expediente.</span>
         </div>
         <form method="post" action="{{ route('accounts.services.save', $opening) }}">
             @csrf
@@ -373,7 +406,7 @@
                 </fieldset>
             </div>
             <div class="actions">
-                <button class="button primary" type="submit">Guardar servicios</button>
+                <button class="button primary" type="submit"><i data-lucide="save"></i> Guardar servicios</button>
             </div>
         </form>
         @if ($servicesComplete && $selectedServiceDocumentTemplates->isNotEmpty())
@@ -387,16 +420,23 @@
                         <div>
                             <h3>{{ $template->name }}</h3>
                             @if (!$template->template_path)
-                                <span class="hint">Documento pendiente de definir. Debe cargarse cuando sea generado desde Econx.</span>
+                                <span class="hint">Documento pendiente de definir. Debe cargarse cuando sea generado desde el sistema.</span>
                             @elseif ($template->template_path)
                                 <div class="doc-actions">
-                                    <a href="{{ route('accounts.services.documents.generate', [$opening, $template]) }}" target="_blank">Abrir documento editable</a>
-                                    <a href="{{ route('accounts.services.documents.original', [$opening, $template]) }}" target="_blank">Ver documento original</a>
+                                    <a class="doc-action" href="{{ route('accounts.services.documents.generate', [$opening, $template]) }}" target="_blank" aria-label="Detectar datos y abrir" data-tooltip="Detectar datos y abrir">
+                                        <i data-lucide="sparkles"></i>
+                                    </a>
+                                    <a class="doc-action" href="{{ route('accounts.services.documents.generate', [$opening, $template, 'modo' => 'vacio']) }}" target="_blank" aria-label="Abrir documento vacío" data-tooltip="Abrir documento vacío">
+                                        <i data-lucide="file-pen-line"></i>
+                                    </a>
+                                    <a class="doc-action" href="{{ route('accounts.services.documents.original', [$opening, $template]) }}" target="_blank" aria-label="Ver documento original" data-tooltip="Ver documento original">
+                                        <i data-lucide="file-search"></i>
+                                    </a>
                                 </div>
                             @else
                                 <span class="hint">Documento generado por el proceso del servicio</span>
                             @endif
-                            <p class="hint">Se guardara como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>
+                            <p class="hint">Se guardará como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>
                             @include('partials.badge', ['status' => $doc->status ?? 'pendiente'])
                         </div>
                         <form method="post" enctype="multipart/form-data" action="{{ route('accounts.services.documents.upload', $opening) }}">
@@ -409,7 +449,7 @@
                                 <option value="validado">Validado</option>
                                 <option value="rechazado">Rechazado</option>
                             </select>
-                            <button class="button secondary" type="submit">{{ $doc ? 'Reemplazar' : 'Subir' }}</button>
+                            <button class="button secondary" type="submit"><i data-lucide="{{ $doc ? 'refresh-cw' : 'upload' }}"></i> {{ $doc ? 'Reemplazar' : 'Subir' }}</button>
                         </form>
                     </article>
                 @endforeach
@@ -417,7 +457,7 @@
         @endif
         @if ($serviceDocsComplete)
             <div class="actions">
-                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'resumen']) }}">Continuar</a>
+                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'resumen']) }}">Continuar <i data-lucide="arrow-right"></i></a>
             </div>
         @endif
     </section>
@@ -428,7 +468,7 @@
         <div class="checklist-actions">
             <a class="button ghost" href="{{ route('accounts.show', [$opening, 'paso' => 'servicios']) }}">Regresar</a>
             <a class="button secondary" href="{{ route('processes.index') }}">Cerrar</a>
-            <button class="button primary" type="button" onclick="window.print()">Guardar expediente</button>
+            <button class="button primary" type="button" onclick="window.print()"><i data-lucide="save"></i> Guardar expediente</button>
         </div>
         <div class="official-check-wrap">
             <table class="official-checklist">
@@ -444,6 +484,10 @@
                         <td colspan="6" class="socio-label">SOCIO N°</td>
                         <td colspan="6" class="socio-number">{{ $opening->file_name }}</td>
                     </tr>
+                    <tr>
+                        <td colspan="6" class="socio-label">AGENCIA</td>
+                        <td colspan="6" class="socio-number">{{ $agencyName }}</td>
+                    </tr>
                     <tr class="section-row">
                         <td colspan="6">{{ str_contains(strtolower($opening->accountType->name), 'jurid') ? 'PERSONAS JURIDICAS' : 'PERSONAS NATURALES' }}</td>
                         <td>Asis.<br>Op</td>
@@ -454,74 +498,23 @@
                         <td>A.<br>Ext/Int</td>
                     </tr>
 
-                    @php $rowNumber = 1; @endphp
-                    @foreach ($internalTemplates->where('is_required', true) as $template)
-                        @php $doc = $internalDocs->get($template->id); @endphp
-                        <tr>
-                            <td class="num">{{ $rowNumber++ }}</td>
-                            <td colspan="5">{{ $template->name }} ({{ $template->source === 'manual' ? 'manual' : 'sistema' }})</td>
-                            <td>{{ $checkLoadedMark($doc?->file_path) }}</td>
-                            <td></td><td></td><td></td><td></td><td></td>
-                        </tr>
-                    @endforeach
-
-                    <tr>
-                        <td class="num">{{ $rowNumber++ }}</td>
-                        <td colspan="5">Consentimiento para el Tratamiento de Datos Personales</td>
-                        <td>{{ $checkLoadedMark($opening->consent?->signed_file_path) }}</td>
-                        <td></td><td></td><td></td><td></td><td></td>
-                    </tr>
-
-                    @if ($requiredExternalIds->isNotEmpty())
-                        @php $externalEvidence = $opening->externalEvidences->whereNotNull('screenshot_path')->first(); @endphp
-                        <tr>
-                            <td class="num">{{ $rowNumber++ }}</td>
-                            <td colspan="5">Revision listas de control (manual)</td>
-                            <td>{{ $checkLoadedMark($externalEvidence?->screenshot_path) }}</td>
-                            <td></td><td></td><td></td><td></td><td></td>
-                        </tr>
-                    @endif
-
                     <tr class="section-row">
-                        <td colspan="12">ARCHIVO DIGITAL</td>
+                        <td colspan="12">DOCUMENTOS DEL EXPEDIENTE EN ORDEN</td>
                     </tr>
 
-                    @php $digitalNumber = 1; @endphp
-                    @foreach ($opening->accountType->requirements as $requirement)
-                        @php
-                            $isSpouseRequirement = $requirement->type->slug === 'documentos-conyuge';
-                            $isRequiredForOpening = $requirement->is_required
-                                || ($isSpouseRequirement && $opening->requires_spouse_documents)
-                                || $selectedOptionalRequirementIds->contains($requirement->id);
-                            $doc = $requirementDocs->get($requirement->id);
-                        @endphp
-                        @continue(!$isRequiredForOpening)
+                    @foreach ($checklistRows as $index => $row)
                         <tr>
-                            <td class="num">{{ $digitalNumber++ }}</td>
-                            <td colspan="5">{{ $requirement->label }}{{ $doc?->file_path ? ' - '.basename($doc->file_path) : '' }}</td>
-                            <td>{{ $checkLoadedMark($doc?->file_path) }}</td>
+                            <td class="num">{{ $index + 1 }}</td>
+                            <td colspan="5">
+                                <strong>{{ $row['name'] }}</strong>
+                                @if ($row['path'] && $row['path'] !== 'check-list-generado')
+                                    <small class="checklist-file-name">{{ basename($row['path']) }}</small>
+                                @endif
+                            </td>
+                            <td>{{ $row['loaded'] ? 'X' : '' }}</td>
                             <td></td><td></td><td></td><td></td><td></td>
                         </tr>
                     @endforeach
-
-                    @foreach ($internalTemplates->where('is_required', true) as $template)
-                        @php $doc = $internalDocs->get($template->id); @endphp
-                        <tr>
-                            <td class="num">{{ $digitalNumber++ }}</td>
-                            <td colspan="5">{{ $template->name }}{{ $doc?->file_path ? ' - '.basename($doc->file_path) : '' }}</td>
-                            <td>{{ $checkLoadedMark($doc?->file_path) }}</td>
-                            <td></td><td></td><td></td><td></td><td></td>
-                        </tr>
-                    @endforeach
-
-                    @if ($opening->consent?->signed_file_path)
-                        <tr>
-                            <td class="num">{{ $digitalNumber++ }}</td>
-                            <td colspan="5">Consentimiento de datos personales - {{ basename($opening->consent->signed_file_path) }}</td>
-                            <td>X</td>
-                            <td></td><td></td><td></td><td></td><td></td>
-                        </tr>
-                    @endif
 
                     <tr class="path-row">
                         <td colspan="12"><strong>Ruta del expediente:</strong> {{ $expedientStoragePath }}</td>

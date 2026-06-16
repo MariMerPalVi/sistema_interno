@@ -1,4 +1,50 @@
 import './bootstrap';
+import {
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  ClipboardCheck,
+  ClipboardPaste,
+  createIcons,
+  ExternalLink,
+  Eye,
+  FilePenLine,
+  FileSearch,
+  FileText,
+  KeyRound,
+  LogOut,
+  PencilLine,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  UserRoundCheck,
+} from 'lucide';
+
+createIcons({
+  icons: {
+    ArrowRight,
+    Building2,
+    CheckCircle2,
+    ClipboardCheck,
+    ClipboardPaste,
+    ExternalLink,
+    Eye,
+    FilePenLine,
+    FileSearch,
+    FileText,
+    KeyRound,
+    LogOut,
+    PencilLine,
+    RefreshCw,
+    Save,
+    ShieldCheck,
+    Sparkles,
+    Upload,
+    UserRoundCheck,
+  },
+});
 
 document.querySelectorAll('input[type="file"]').forEach((input) => {
   input.addEventListener('change', () => {
@@ -58,16 +104,18 @@ document.querySelectorAll('.paste-capture').forEach((zone) => {
     reader.onload = () => {
       const image = new Image();
       image.onload = () => {
+        const maxDimension = 1600;
+        const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
         const canvas = document.createElement('canvas');
-        canvas.width = image.naturalWidth;
-        canvas.height = image.naturalHeight;
+        canvas.width = Math.round(image.naturalWidth * scale);
+        canvas.height = Math.round(image.naturalHeight * scale);
 
         const context = canvas.getContext('2d');
         context.fillStyle = '#ffffff';
         context.fillRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(image, 0, 0);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.78);
         const estimatedBytes = Math.ceil((jpegDataUrl.length - 'data:image/jpeg;base64,'.length) * 0.75);
 
         if (estimatedBytes > 5 * 1024 * 1024) {
@@ -125,5 +173,21 @@ document.querySelectorAll('.external-evidence-form').forEach((form) => {
       zone.focus();
       label.textContent = 'Pegue esta evidencia antes de guardar';
     }
+  });
+});
+
+document.querySelectorAll('form').forEach((form) => {
+  form.addEventListener('submit', (event) => {
+    requestAnimationFrame(() => {
+      if (event.defaultPrevented) return;
+
+      const button = event.submitter;
+      if (!(button instanceof HTMLButtonElement)) return;
+
+      button.disabled = true;
+      button.classList.add('is-loading');
+      button.dataset.originalLabel = button.textContent.trim();
+      button.textContent = 'Guardando...';
+    });
   });
 });

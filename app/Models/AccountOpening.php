@@ -13,6 +13,7 @@ class AccountOpening extends Model
         'public_code',
         'file_name',
         'storage_folder',
+        'agency',
         'requires_spouse_documents',
         'account_type_id',
         'created_by',
@@ -37,8 +38,14 @@ class AccountOpening extends Model
 
     public function resolveRouteBinding($value, $field = null)
     {
-        return $this->where('public_code', $value)
-            ->when(is_numeric($value), fn ($query) => $query->orWhere('id', $value))
+        return $this->where(function ($query) use ($value) {
+            $query->where('public_code', $value)
+                ->when(is_numeric($value), fn ($query) => $query->orWhere('id', $value));
+        })
+            ->when(
+                auth()->check() && !auth()->user()->isAdministrator(),
+                fn ($query) => $query->where('agency', auth()->user()->agency)
+            )
             ->firstOrFail();
     }
 

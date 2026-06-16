@@ -9,18 +9,28 @@ use Throwable;
 
 class DocumentExtractionService
 {
-    public function extract(string $slug, UploadedFile $file): array
+    public function extract(string $slug, UploadedFile $file, bool $forceOcr = false): array
     {
-        $text = $this->extractText($file);
-        $normalized = $this->normalize($text);
         $base = [
             'archivo' => $file->getClientOriginalName(),
+        ];
+
+        if (!in_array($slug, ['cedula-papeleta', 'cedula', 'papeleta-votacion', 'planilla-servicios', 'ruc'], true)) {
+            return $base + [
+                'revision' => 'Carga registrada. Validación documental pendiente.',
+                'requiere_validacion_manual' => true,
+            ];
+        }
+
+        $text = $this->extractText($file, $forceOcr);
+        $normalized = $this->normalize($text);
+        $base += [
             'fuente_texto' => $text !== '' ? 'Texto embebido en el PDF/archivo' : 'Sin texto detectable',
         ];
 
         if ($text === '') {
             return $base + [
-                'alerta' => 'El archivo parece ser un escaneo como imagen. Para extraer nombres/direccion automaticamente se requiere OCR; mientras tanto debe validarse manualmente.',
+                'alerta' => 'El archivo parece ser un escaneo como imagen. Para extraer nombres/dirección automáticamente se requiere OCR; mientras tanto debe validarse manualmente.',
                 'requiere_validacion_manual' => true,
             ];
         }
@@ -37,7 +47,7 @@ class DocumentExtractionService
         };
     }
 
-    private function extractText(UploadedFile $file): string
+    private function extractText(UploadedFile $file, bool $forceOcr = false): string
     {
         $text = '';
 
@@ -49,7 +59,7 @@ class DocumentExtractionService
             }
         }
 
-        if (config('opening.ocr_enabled', false)) {
+        if ($forceOcr || config('opening.ocr_enabled', false)) {
             $ocrText = $this->extractTextWithWindowsOcr($file);
             if (mb_strlen($ocrText) > 30) {
                 $text = trim($text."\n".$ocrText);
@@ -133,7 +143,7 @@ class DocumentExtractionService
                 '/NACIONALIDAD\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ ]{4,40})/',
                 '/\b(ECUATORIANA|ECUATORIANO|COLOMBIANA|COLOMBIANO|VENEZOLANA|VENEZOLANO)\b/',
             ]),
-            'alerta_cedula' => isset($ids[0]) ? null : 'No se detecto un numero de cedula ecuatoriana valido en el texto extraido.',
+            'alerta_cedula' => isset($ids[0]) ? null : 'No se detectó un número de cédula ecuatoriana válido en el texto extraído.',
         ];
     }
 
@@ -154,7 +164,7 @@ class DocumentExtractionService
             'corresponde_ultima_eleccion' => $hasLatestYear,
             'alerta_papeleta' => $hasVotingWords && $hasLatestYear
                 ? null
-                : "Confirmar manualmente que la papeleta corresponda a la ultima eleccion configurada ({$latestYear}).",
+                : "Confirmar manualmente que la papeleta corresponda a la última elección configurada ({$latestYear}).",
         ];
     }
 
@@ -230,8 +240,10 @@ class DocumentExtractionService
     private function extractPersonName(string $text): ?string
     {
         $patterns = [
-            '/CERTIFICADO DE VOTACI[ÓO]N.*?(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVIN(?:CIA|GA)?\b/si',
-            '/(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVIN(?:CIA|GA)?\b/si',
+            '/NOMBRE DEL TITULAR\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:C[ÉE]DULA|CORREO|TEL[ÉE]FONO|FIRMA|FECHA)\b)/si',
+            '/YO[,\s]+([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s*,?\s*PORTADOR(?:A)?\b)/si',
+            '/CERTIFICADO DE VOTACI[ÓO]N.*?(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVIN[A-ZÁÉÍÓÚÑ]{0,6}\b/si',
+            '/(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVIN[A-ZÁÉÍÓÚÑ]{0,6}\b/si',
             '/(?:APELLIDOS Y NOMBRES|NOMBRES Y APELLIDOS)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si',
             '/(?:CIUDADANO|CIUDADANA)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si',
         ];

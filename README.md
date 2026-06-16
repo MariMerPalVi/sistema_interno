@@ -13,7 +13,7 @@ Aplicacion Laravel + Vite para procesos internos de una cooperativa. La primera 
 - Validacion de tamano maximo de 5 MB.
 - Extraccion preliminar desde texto incorporado en PDF. El OCR de imagenes queda desactivado temporalmente con `OCR_ENABLED=false`.
 - Lista de control externa con enlaces oficiales y un PDF consolidado con evidencias.
-- Documentos internos separados entre manuales y documentos generados por Econx.
+- Documentos internos separados entre manuales y documentos generados por el sistema.
 - Seleccion de servicios adicionales y documentos firmados por servicio.
 - Check List del expediente con documentos adjuntados e historial de auditoria.
 - Revision digital automatica del expediente, con estado aprobado u observado, puntaje y hallazgos.
