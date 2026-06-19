@@ -7,6 +7,7 @@
     $isBdh = str_contains($slug, 'bdh') || str_contains($slug, 'acreditacion') || str_contains($slug, 'reapertura') || str_contains($slug, 'cierre');
     $isMortuaryFund = str_contains($slug, 'formulario-servicio-fondo-mortuorio');
     $isNoMortuaryFund = str_contains($slug, 'sin-fondo-mortuorio');
+    $isContributionCertificate = str_contains($slug, 'certificado-de-aportacion');
     $fullName = trim(preg_replace('/\s+/', ' ', $fields['apellidos_nombres'] ?? ''));
     $identification = preg_replace('/\D+/', '', $fields['cedula_identidad'] ?? '');
     $accountNumber = $fields['cuenta_numero'] ?? $opening->file_name;
@@ -23,6 +24,7 @@
     $yearSuffix = substr((string) $year, -1);
     $requestType = $fields['tipo_solicitante'] ?? 'socio';
     $mortuaryFund = $fields['fondo_mortuorio'] ?? 'no';
+    $nominalValue = $fields['valor_nominal'] ?? '';
 @endphp
 <!doctype html>
 <html lang="es">
@@ -891,6 +893,151 @@
             min-height: 120mm;
         }
 
+        .contribution-certificate {
+            position: relative;
+            min-height: 297mm;
+            padding: 43mm 14mm 25mm;
+            color: #17202a;
+        }
+
+        .contribution-certificate h1 {
+            position: relative;
+            margin: 0;
+            padding: 3.2mm 2mm 2.8mm;
+            background: #087fc3;
+            color: #fff;
+            font-size: 26px;
+            line-height: 1.05;
+            text-align: center;
+            letter-spacing: 0;
+        }
+
+        .contribution-certificate h1::after {
+            position: absolute;
+            right: 0;
+            bottom: -1.7mm;
+            left: 0;
+            height: .7mm;
+            background: #00a86b;
+            content: "";
+        }
+
+        .certificate-office {
+            margin: 10mm 0 36mm;
+            text-align: center;
+        }
+
+        .certificate-office strong,
+        .certificate-office span {
+            display: block;
+        }
+
+        .certificate-office strong {
+            margin-bottom: .5mm;
+            font-size: 17px;
+            line-height: 1.1;
+        }
+
+        .certificate-office span {
+            font-size: 8px;
+            line-height: 1.2;
+        }
+
+        .certificate-copy {
+            margin: 0 auto 18mm;
+            max-width: 166mm;
+            font-size: 11.5px;
+            line-height: 1.25;
+            text-align: justify;
+        }
+
+        .certificate-beneficiary {
+            margin: 0 auto;
+            width: 158mm;
+            font-size: 11.5px;
+            text-align: center;
+        }
+
+        .certificate-beneficiary > span:first-child {
+            display: block;
+        }
+
+        .certificate-beneficiary-name {
+            display: block;
+            width: 110mm;
+            min-height: 6mm;
+            margin: 17mm auto 0;
+            border-bottom: 1px solid #17202a;
+            font-weight: 600;
+        }
+
+        .certificate-beneficiary-id {
+            display: flex;
+            align-items: end;
+            justify-content: center;
+            gap: 2mm;
+            margin-top: 1.5mm;
+            font-weight: 700;
+        }
+
+        .certificate-beneficiary-id .certificate-field {
+            width: 30mm;
+        }
+
+        .certificate-account-fields {
+            display: grid;
+            grid-template-columns: 60mm 1fr;
+            gap: 2mm 3mm;
+            width: 160mm;
+            margin: 13mm auto 0;
+            font-size: 11.5px;
+        }
+
+        .certificate-account-fields strong {
+            align-self: end;
+            text-align: right;
+        }
+
+        .certificate-field {
+            display: inline-block;
+            min-width: 18mm;
+            min-height: 4.5mm;
+            padding: .2mm 2mm;
+            border-bottom: 1px solid #17202a;
+            font-weight: 600;
+        }
+
+        .certificate-date {
+            margin: 13mm 0 0;
+            text-align: center;
+            font-size: 10.5px;
+        }
+
+        .certificate-date .certificate-field {
+            min-width: 11mm;
+            padding-inline: 1mm;
+            text-align: center;
+        }
+
+        .certificate-signatures {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18mm;
+            margin: 32mm 6mm 0;
+            text-align: center;
+            font-size: 9.5px;
+        }
+
+        .certificate-signatures div {
+            padding-top: 2mm;
+            border-top: 1px solid #17202a;
+        }
+
+        .certificate-signatures strong,
+        .certificate-signatures span {
+            display: block;
+        }
+
         .generic-row {
             display: grid;
             grid-template-columns: 46mm 1fr;
@@ -940,8 +1087,8 @@
         <button type="button" onclick="window.close()">Cerrar</button>
     </div>
 
-    <main class="page {{ $isApplication ? 'pdf-template' : '' }} {{ $isBdh ? 'bdh-template' : '' }}">
-        @unless ($isApplication || $isSignatureRegister || $isBdh || $isMortuaryFund || $isNoMortuaryFund)
+    <main class="page {{ ($isApplication || $isContributionCertificate) ? 'pdf-template' : '' }} {{ $isBdh ? 'bdh-template' : '' }}">
+        @unless ($isApplication || $isSignatureRegister || $isBdh || $isMortuaryFund || $isNoMortuaryFund || $isContributionCertificate)
             <div class="watermark"></div>
             <div class="brand-row">
                 <img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves">
@@ -1358,6 +1505,60 @@
                         </span>
                     </div>
                     <img class="mortuary-seal" src="{{ asset('images/sello-las-naves.png') }}" alt="Sello Las Naves">
+                </div>
+            </section>
+        @elseif ($isContributionCertificate)
+            <img class="template-bg" src="{{ asset('formatos/Fondo_page-0001.jpg') }}" alt="">
+            <section class="contribution-certificate" aria-label="Certificado de aportación editable">
+                <h1>CERTIFICADO DE APORTACIÓN</h1>
+
+                <div class="certificate-office">
+                    <strong>MATRIZ LAS NAVES</strong>
+                    <span>Dir: Calle 10 de octubre y 10 de Agosto</span>
+                    <span>Permiso de Funcionamiento: SEPS-INFERS-DNGRF-TF-2022-0534</span>
+                    <span>Código de Oficina: 0495</span>
+                    <span>Fecha de Registro: 2022-08-04</span>
+                </div>
+
+                <p class="certificate-copy">
+                    La Cooperativa de Ahorro y Crédito Las Naves Ltda. creada mediante acuerdo ministerial 000365
+                    e inscrita en el Registro Oficial de Cooperativas el 10 de junio de 1982, emite el presente
+                    <strong>CERTIFICADO DE APORTACIÓN</strong>:
+                </p>
+
+                <div class="certificate-beneficiary">
+                    <span>A favor de:</span>
+                    <span class="certificate-beneficiary-name" contenteditable="true" spellcheck="false">{{ $fullName }}</span>
+                    <span class="certificate-beneficiary-id">
+                        <strong>C.I.:</strong>
+                        <span class="certificate-field" contenteditable="true" spellcheck="false">{{ $identification }}</span>
+                    </span>
+                </div>
+
+                <div class="certificate-account-fields">
+                    <strong>Por un valor nominal de:</strong>
+                    <span class="certificate-field" contenteditable="true" spellcheck="false">{{ $nominalValue }}</span>
+
+                    <strong>Número de cuenta:</strong>
+                    <span class="certificate-field" contenteditable="true" spellcheck="false">{{ $accountNumber }}</span>
+                </div>
+
+                <p class="certificate-date">
+                    Las Naves,
+                    <span class="certificate-field" contenteditable="true" spellcheck="false">{{ $day }}</span>
+                    de <span class="certificate-field" contenteditable="true" spellcheck="false">{{ $month }}</span>
+                    de <span class="certificate-field" contenteditable="true" spellcheck="false">{{ $year }}</span>
+                </p>
+
+                <div class="certificate-signatures">
+                    <div>
+                        <strong>LCDA. NANCY ALEGRÍA SUAREZ</strong>
+                        <span>PRESIDENTE</span>
+                    </div>
+                    <div>
+                        <strong>ING. HITER MERA SANTANA</strong>
+                        <span>GERENTE</span>
+                    </div>
                 </div>
             </section>
         @else

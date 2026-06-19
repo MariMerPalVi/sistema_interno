@@ -38,32 +38,20 @@ class AccountOpeningController extends Controller
 
     public function store(Request $request)
     {
-        $request->merge([
-            'file_name' => trim((string) $request->input('file_name')),
-        ]);
-
         $data = $request->validate([
             'account_type_id' => ['required', 'exists:account_types,id'],
-            'file_name' => [
-                'required',
-                'string',
-                'max:120',
-                Rule::unique('account_openings', 'file_name'),
-            ],
-        ], [
-            'file_name.unique' => 'Ya existe un expediente con este número o nombre en la cooperativa.',
         ]);
 
         $opening = DB::transaction(function () use ($data) {
             $publicCode = $this->makePublicCode();
-            $fileName = trim($data['file_name']);
             $agency = auth()->user()->agency;
             $agencyFolder = config("opening.agencies.{$agency}.folder", $agency);
 
             $opening = AccountOpening::create([
                 'public_code' => $publicCode,
-                'file_name' => $fileName,
-                'storage_folder' => $this->safeFileNamePart($agencyFolder).'/'.$this->safeFileNamePart($fileName),
+                'file_name' => $publicCode,
+                'file_name_confirmed' => false,
+                'storage_folder' => $this->safeFileNamePart($agencyFolder).'/Temporales/'.$publicCode,
                 'agency' => $agency,
                 'account_type_id' => $data['account_type_id'],
                 'created_by' => auth()->id(),
@@ -75,7 +63,7 @@ class AccountOpeningController extends Controller
                 'template_path' => 'formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf',
             ]);
 
-            $this->audit($opening, 'crear_expediente', 'Expediente de apertura creado.', [
+            $this->audit($opening, 'crear_expediente', 'Expediente temporal de apertura creado.', [
                 'agency' => $agency,
                 'storage_folder' => $opening->storage_folder,
             ]);
@@ -83,7 +71,7 @@ class AccountOpeningController extends Controller
             return $opening;
         });
 
-        return redirect()->route('accounts.show', $opening)->with('success', 'Expediente creado. Complete el flujo paso a paso.');
+        return redirect()->route('accounts.show', $opening)->with('success', 'Proceso iniciado. Complete el consentimiento para continuar.');
     }
 
     public function show(Request $request, AccountOpening $opening)
@@ -403,15 +391,129 @@ class AccountOpeningController extends Controller
             ['company_check_applicable' => $companyApplicable]
         );
 
-        $nextStep = $this->externalChecksAreComplete($opening) ? 'internos' : 'externas';
+        $nextStep = $this->externalChecksAreComplete($opening) ? 'expediente' : 'externas';
 
         return redirect()
             ->route('accounts.show', [$opening, 'paso' => $nextStep])
             ->with('success', 'Evidencia externa guardada.');
     }
 
+    public function confirmFileName(Request $request, AccountOpening $opening)
+    {
+        if (!$this->externalChecksAreComplete($opening)) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'externas'])
+                ->withErrors('Complete las consultas externas antes de asignar el nombre definitivo.');
+        }
+
+        if ($opening->file_name_confirmed) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'internos'])
+                ->withErrors('El nombre definitivo del expediente ya fue asignado.');
+        }
+
+        $request->merge([
+            'file_name' => trim((string) $request->input('file_name')),
+        ]);
+
+        $data = $request->validate([
+            'file_name' => ['required', 'string', 'max:120', Rule::unique('account_openings', 'file_name')],
+        ], [
+            'file_name.unique' => 'Ya existe un expediente con este número o nombre en la cooperativa.',
+        ]);
+
+        $oldName = $opening->file_name;
+        $newName = $data['file_name'];
+        $oldDirectory = "aperturas/{$opening->storage_folder}";
+        $agencyFolder = config("opening.agencies.{$opening->agency}.folder", $opening->agency);
+        $newStorageFolder = $this->safeFileNamePart($agencyFolder).'/'.$this->safeFileNamePart($newName);
+        $newDirectory = "aperturas/{$newStorageFolder}";
+
+        if (Storage::exists($newDirectory)) {
+            return back()->withErrors('Ya existe una carpeta con este nombre. Ingrese otro número de expediente.');
+        }
+
+        $pathMap = [];
+        $movedFiles = [];
+
+        try {
+            Storage::makeDirectory($newDirectory);
+
+            foreach (Storage::allFiles($oldDirectory) as $oldPath) {
+                $oldBaseName = basename($oldPath);
+                $newBaseName = str_replace(
+                    $this->safeFileNamePart($oldName),
+                    $this->safeFileNamePart($newName),
+                    $oldBaseName
+                );
+                $newPath = "{$newDirectory}/{$newBaseName}";
+
+                if (!Storage::move($oldPath, $newPath)) {
+                    throw new \RuntimeException("No se pudo mover {$oldBaseName}.");
+                }
+
+                $pathMap[$oldPath] = $newPath;
+                $movedFiles[$newPath] = $oldPath;
+            }
+
+            DB::transaction(function () use ($opening, $oldName, $newName, $newStorageFolder, $pathMap) {
+                if ($opening->consent?->signed_file_path && isset($pathMap[$opening->consent->signed_file_path])) {
+                    $opening->consent->update([
+                        'signed_file_path' => $pathMap[$opening->consent->signed_file_path],
+                    ]);
+                }
+
+                foreach ($opening->documents as $document) {
+                    if (isset($pathMap[$document->file_path])) {
+                        $document->update(['file_path' => $pathMap[$document->file_path]]);
+                    }
+                }
+
+                foreach ($opening->externalEvidences as $evidence) {
+                    if ($evidence->screenshot_path && isset($pathMap[$evidence->screenshot_path])) {
+                        $evidence->update(['screenshot_path' => $pathMap[$evidence->screenshot_path]]);
+                    }
+                }
+
+                $opening->update([
+                    'file_name' => $newName,
+                    'file_name_confirmed' => true,
+                    'storage_folder' => $newStorageFolder,
+                ]);
+
+                $this->audit($opening, 'asignar_nombre_expediente', 'Nombre definitivo del expediente asignado.', [
+                    'anterior' => $oldName,
+                    'nuevo' => $newName,
+                    'storage_folder' => $newStorageFolder,
+                ]);
+            });
+
+            Storage::deleteDirectory($oldDirectory);
+        } catch (\Throwable $exception) {
+            foreach (array_reverse($movedFiles, true) as $newPath => $oldPath) {
+                if (Storage::exists($newPath)) {
+                    Storage::move($newPath, $oldPath);
+                }
+            }
+            Storage::deleteDirectory($newDirectory);
+
+            report($exception);
+
+            return back()->withErrors('No se pudo renombrar la carpeta del expediente. Intente nuevamente.');
+        }
+
+        return redirect()
+            ->route('accounts.show', [$opening->fresh(), 'paso' => 'internos'])
+            ->with('success', 'Nombre definitivo guardado. La carpeta y los archivos fueron renombrados.');
+    }
+
     public function generateInternalDocument(Request $request, AccountOpening $opening, InternalDocumentTemplate $template)
     {
+        if (!$opening->file_name_confirmed) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'expediente'])
+                ->withErrors('Asigne el nombre definitivo del expediente antes de generar documentos internos.');
+        }
         $template = $this->internalTemplatesForOpening($opening)
             ->where('id', $template->id)
             ->firstOrFail();
@@ -461,6 +563,11 @@ class AccountOpeningController extends Controller
 
     public function showInternalOriginal(AccountOpening $opening, InternalDocumentTemplate $template)
     {
+        if (!$opening->file_name_confirmed) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'expediente'])
+                ->withErrors('Asigne el nombre definitivo del expediente antes de abrir documentos internos.');
+        }
         $template = $this->internalTemplatesForOpening($opening)
             ->where('id', $template->id)
             ->firstOrFail();
@@ -502,6 +609,12 @@ class AccountOpeningController extends Controller
                 ->withErrors('Complete las capturas obligatorias de consultas externas antes de documentos internos.');
         }
 
+        if (!$opening->file_name_confirmed) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'expediente'])
+                ->withErrors('Asigne el nombre definitivo del expediente antes de cargar documentos internos.');
+        }
+
         $template = $this->internalTemplatesForOpening($opening)
             ->where('id', $data['internal_document_template_id'])
             ->firstOrFail();
@@ -536,6 +649,11 @@ class AccountOpeningController extends Controller
 
     public function saveServices(Request $request, AccountOpening $opening)
     {
+        if (!$opening->file_name_confirmed) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'expediente'])
+                ->withErrors('Asigne el nombre definitivo del expediente antes de registrar servicios.');
+        }
         if (!$this->consentIsValid($opening)) {
             return redirect()
                 ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
@@ -550,6 +668,11 @@ class AccountOpeningController extends Controller
 
         $data = $request->validate([
             'fondo_mortuorio' => ['required', Rule::in(['si', 'no'])],
+            'tipo_vinculacion' => [
+                Rule::requiredIf($this->contributionCertificateApplies($opening)),
+                'nullable',
+                Rule::in(['socio', 'cliente']),
+            ],
         ]);
 
         DB::transaction(function () use ($opening, $data) {
@@ -565,7 +688,7 @@ class AccountOpeningController extends Controller
                 SelectedAdditionalService::create([
                     'account_opening_id' => $opening->id,
                     'additional_service_id' => $serviceId,
-                    'selected_by' => null,
+                    'selected_by' => auth()->id(),
                 ]);
             }
         });
@@ -574,7 +697,12 @@ class AccountOpeningController extends Controller
             $opening,
             'seleccionar_servicios',
             'Servicios adicionales actualizados.',
-            ['fondo_mortuorio' => $data['fondo_mortuorio']]
+            [
+                'fondo_mortuorio' => $data['fondo_mortuorio'],
+                'tipo_vinculacion' => $this->contributionCertificateApplies($opening)
+                    ? ($data['tipo_vinculacion'] ?? null)
+                    : null,
+            ]
         );
 
         return redirect()
@@ -584,7 +712,15 @@ class AccountOpeningController extends Controller
 
     public function generateServiceDocument(Request $request, AccountOpening $opening, InternalDocumentTemplate $template)
     {
-        $template = $this->serviceDocumentTemplates()->where('id', $template->id)->firstOrFail();
+        if (!$opening->file_name_confirmed) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'expediente'])
+                ->withErrors('Asigne el nombre definitivo del expediente antes de generar documentos de servicios.');
+        }
+        $template = $this->serviceDocumentTemplates()
+            ->whereIn('slug', $this->requiredServiceTemplateSlugs($opening))
+            ->where('id', $template->id)
+            ->firstOrFail();
 
         if (!$template->template_path) {
             return redirect()
@@ -600,6 +736,7 @@ class AccountOpeningController extends Controller
             'apellidos_nombres',
             'cedula_identidad',
             'cuenta_numero',
+            'valor_nominal',
             'ciudad',
             'dia',
             'mes',
@@ -616,7 +753,15 @@ class AccountOpeningController extends Controller
 
     public function showServiceOriginal(AccountOpening $opening, InternalDocumentTemplate $template)
     {
-        $template = $this->serviceDocumentTemplates()->where('id', $template->id)->firstOrFail();
+        if (!$opening->file_name_confirmed) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'expediente'])
+                ->withErrors('Asigne el nombre definitivo del expediente antes de abrir documentos de servicios.');
+        }
+        $template = $this->serviceDocumentTemplates()
+            ->whereIn('slug', $this->requiredServiceTemplateSlugs($opening))
+            ->where('id', $template->id)
+            ->firstOrFail();
 
         abort_unless($template->template_path && is_file(public_path($template->template_path)), 404);
 
@@ -628,6 +773,11 @@ class AccountOpeningController extends Controller
 
     public function uploadServiceDocument(Request $request, AccountOpening $opening)
     {
+        if (!$opening->file_name_confirmed) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'expediente'])
+                ->withErrors('Asigne el nombre definitivo del expediente antes de cargar documentos de servicios.');
+        }
         if (!$this->consentIsValid($opening)) {
             return redirect()
                 ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
@@ -650,6 +800,7 @@ class AccountOpeningController extends Controller
         }
 
         $template = $this->serviceDocumentTemplates()
+            ->whereIn('slug', $this->requiredServiceTemplateSlugs($opening))
             ->where('id', $data['internal_document_template_id'])
             ->firstOrFail();
 
@@ -1458,6 +1609,19 @@ class AccountOpeningController extends Controller
         ];
     }
 
+    private function contributionCertificateApplies(AccountOpening $opening): bool
+    {
+        return in_array($opening->accountType->slug, ['cuenta-ahorro-programado', 'cuenta-juridica'], true);
+    }
+
+    private function membershipDecision(AccountOpening $opening): ?string
+    {
+        return data_get($opening->histories()
+            ->where('action', 'seleccionar_servicios')
+            ->latest('id')
+            ->first()?->metadata, 'tipo_vinculacion');
+    }
+
     private function orderedChecklistRows(AccountOpening $opening): array
     {
         $opening->loadMissing(['accountType.requirements.type', 'documents', 'consent', 'externalEvidences', 'histories']);
@@ -1573,15 +1737,10 @@ class AccountOpeningController extends Controller
                 fn ($requirement) => $requirement->type->slug === 'planilla-servicios',
                 'Planilla de servicio básico'
             );
+        }
 
-            $serviceTemplate = $serviceTemplates->first(fn ($template) => in_array(
-                $template->slug,
-                $this->requiredServiceTemplateSlugs($opening)->all(),
-                true
-            ));
-            if ($serviceTemplate) {
-                $add($serviceTemplate->name, $serviceDocs->get($serviceTemplate->id)?->file_path, 'Servicio');
-            }
+        foreach ($serviceTemplates->whereIn('slug', $this->requiredServiceTemplateSlugs($opening)) as $serviceTemplate) {
+            $add($serviceTemplate->name, $serviceDocs->get($serviceTemplate->id)?->file_path, 'Servicio');
         }
 
         $addInternal('registro de firmas', 'Registro de firmas', false, 'manual');
@@ -1613,12 +1772,21 @@ class AccountOpeningController extends Controller
             $templateSlugs->push('sin-fondo-mortuorio');
         }
 
+        if ($this->contributionCertificateApplies($opening) && $this->membershipDecision($opening) === 'socio') {
+            $templateSlugs->push('certificado-de-aportacion');
+        }
+
         return $templateSlugs->unique()->values();
     }
 
     private function servicesStepIsComplete(AccountOpening $opening): bool
     {
-        return $opening->histories()->where('action', 'seleccionar_servicios')->exists();
+        if (!$opening->histories()->where('action', 'seleccionar_servicios')->exists()) {
+            return false;
+        }
+
+        return !$this->contributionCertificateApplies($opening)
+            || in_array($this->membershipDecision($opening), ['socio', 'cliente'], true);
     }
 
     private function serviceDocumentsAreComplete(AccountOpening $opening): bool
@@ -1648,6 +1816,7 @@ class AccountOpeningController extends Controller
             'consentimiento' => $this->consentIsValid($opening),
             'requisitos' => $this->requiredDocumentsAreValid($opening),
             'externas' => $this->externalChecksAreComplete($opening),
+            'expediente' => $opening->file_name_confirmed,
             'internos' => $this->internalDocumentsAreComplete($opening),
             'servicios' => $this->serviceDocumentsAreComplete($opening),
             'resumen' => in_array($opening->status, ['en_revision', 'aprobado', 'finalizado'], true),
@@ -1657,7 +1826,8 @@ class AccountOpeningController extends Controller
             'consentimiento' => true,
             'requisitos' => $complete['consentimiento'],
             'externas' => $complete['requisitos'],
-            'internos' => $complete['externas'],
+            'expediente' => $complete['externas'],
+            'internos' => $complete['expediente'],
             'servicios' => $complete['internos'],
             'resumen' => $complete['servicios'],
         ];
@@ -1676,6 +1846,7 @@ class AccountOpeningController extends Controller
         return $this->consentIsValid($opening)
             && $this->requiredDocumentsAreValid($opening)
             && $this->externalChecksAreComplete($opening)
+            && $opening->file_name_confirmed
             && $this->internalDocumentsAreComplete($opening)
             && $this->serviceDocumentsAreComplete($opening);
     }
@@ -1686,6 +1857,7 @@ class AccountOpeningController extends Controller
             $this->consentIsValid($opening),
             $this->requiredDocumentsAreValid($opening),
             $this->externalChecksAreComplete($opening),
+            $opening->file_name_confirmed,
             $this->internalDocumentsAreComplete($opening),
             $this->serviceDocumentsAreComplete($opening),
             in_array($opening->status, ['en_revision', 'aprobado', 'finalizado'], true),

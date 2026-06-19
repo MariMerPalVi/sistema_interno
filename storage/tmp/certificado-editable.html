@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Certificado de aportación</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #e7edf2;
+            color: #161d26;
+            font-family: "Poppins", Arial, Helvetica, sans-serif;
+        }
+
+        .toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding: 12px;
+            background: #ffffff;
+            border-bottom: 1px solid #cbd7e2;
+        }
+
+        button {
+            min-height: 38px;
+            padding: 0 16px;
+            border: 0;
+            border-radius: 6px;
+            background: #00796b;
+            color: #fff;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .page {
+            position: relative;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 18px auto;
+            padding: 18mm 18mm 16mm;
+            background: #fff;
+            overflow: hidden;
+            box-shadow: 0 14px 36px rgba(15, 23, 42, .18);
+        }
+
+        .page.pdf-template {
+            height: 297mm;
+            min-height: 297mm;
+            padding: 0;
+        }
+
+        .template-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            object-fit: cover;
+            pointer-events: none;
+            background: #fff;
+        }
+
+        .template-content {
+            position: relative;
+            z-index: 1;
+            padding: 26mm 17mm 16mm;
+        }
+
+        .application-document {
+            width: 100%;
+            color: #111;
+            font-family: "Poppins", Arial, Helvetica, sans-serif;
+        }
+
+        .application-document h1 {
+            margin: 4mm 0 18mm;
+            font-size: 18px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .application-document p {
+            margin: 0 0 3.8mm;
+            font-size: 11px;
+            line-height: 1.32;
+        }
+
+        .application-document .letter-date {
+            margin-left: 58mm;
+            margin-bottom: 14mm;
+            white-space: nowrap;
+        }
+
+        .application-document .editable {
+            min-width: 32mm;
+            padding: 0 .8mm;
+            border-bottom: 1px solid #111;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .application-document .editable.short {
+            min-width: 8mm;
+        }
+
+        .application-document .editable.medium {
+            min-width: 22mm;
+        }
+
+        .application-document .editable.long {
+            min-width: 116mm;
+        }
+
+        .application-document .check {
+            width: auto;
+            height: auto;
+            min-width: 4mm;
+            border: 0;
+            margin: 0;
+            line-height: inherit;
+        }
+
+        .application-document .signature {
+            margin: 15mm 0 8mm;
+            text-align: center;
+        }
+
+        .application-document .signature span {
+            min-width: 54mm;
+            border-top: 1px solid #111;
+            padding-top: 2mm;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .junior-application h1 {
+            margin-bottom: 2mm;
+        }
+
+        .junior-application .subtitle {
+            margin: 0 0 14mm;
+            font-size: 14px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .junior-application .junior-name {
+            min-width: 105mm;
+        }
+
+        .junior-application .junior-id {
+            min-width: 40mm;
+        }
+
+        .junior-application .signature {
+            margin-top: 20mm;
+        }
+
+        .legal-application h1 {
+            margin-bottom: 2mm;
+        }
+
+        .legal-application .subtitle {
+            margin: 0 0 13mm;
+            font-size: 14px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .legal-application .legal-name {
+            min-width: 103mm;
+        }
+
+        .legal-application .legal-company {
+            min-width: 105mm;
+        }
+
+        .legal-application .legal-ruc,
+        .legal-application .legal-id {
+            min-width: 40mm;
+        }
+
+        .legal-application .legal-role {
+            min-width: 48mm;
+        }
+
+        .legal-signatures {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 34mm;
+            margin: 17mm 0 8mm;
+        }
+
+        .legal-signatures span {
+            border-top: 1px solid #111;
+            padding-top: 2mm;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .approval-box {
+            margin-top: 7mm;
+            padding: 5mm 6mm 4mm;
+            border: 1.4px solid #111;
+            font-size: 9px;
+            line-height: 1.35;
+        }
+
+        .approval-box p {
+            margin-bottom: 8mm;
+            font-size: 9px;
+            line-height: 1.35;
+            text-align: justify;
+        }
+
+        .manager-signature {
+            text-align: center;
+            font-size: 9px;
+        }
+
+        .manager-signature span {
+            display: inline-block;
+            min-width: 64mm;
+            border-top: 1px solid #111;
+            padding-top: 2mm;
+        }
+
+        .pdf-field {
+            position: absolute;
+            min-height: 4mm;
+            padding: 0 .8mm;
+            border: 0;
+            background: transparent;
+            color: #161d26;
+            font-size: 9px;
+            font-weight: 800;
+            line-height: 1.1;
+            outline: none;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .pdf-check {
+            position: absolute;
+            width: 5mm;
+            height: 5mm;
+            color: #161d26;
+            font-size: 11px;
+            font-weight: 900;
+            line-height: 5mm;
+            text-align: center;
+            outline: none;
+        }
+
+        .page.bdh-template {
+            padding: 0;
+            background: #fff;
+        }
+
+        .bdh-document {
+            position: relative;
+            min-height: 297mm;
+            padding: 4mm 8mm 0;
+            color: #000;
+            font-family: "Poppins", Arial, Helvetica, sans-serif;
+            font-size: 15px;
+            line-height: 1.38;
+        }
+
+        .bdh-logo {
+            width: 72mm;
+            height: auto;
+            margin-left: 1mm;
+        }
+
+        .bdh-account-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 9mm;
+            height: 10mm;
+            margin-top: 1mm;
+            padding-right: 8mm;
+            font-weight: 900;
+        }
+
+        .bdh-title {
+            margin: 0 -8mm 2.5mm;
+            min-height: 14mm;
+            padding: 2mm 5mm;
+            background: #0879bd;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.35;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .bdh-line {
+            margin: 0 0 2.4mm;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .bdh-line.center {
+            text-align: center;
+        }
+
+        .bdh-line.justify {
+            text-align: justify;
+        }
+
+        .bdh-person-row {
+            display: block;
+            margin-bottom: 2.4mm;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .bdh-person-part {
+            display: inline;
+        }
+
+        .bdh-person-part.identity {
+            display: inline;
+        }
+
+        .bdh-person-part.identity span:first-child {
+            white-space: normal;
+        }
+
+        .bdh-place-date {
+            display: grid;
+            grid-template-columns: auto minmax(28mm, 42mm) auto minmax(45mm, 1fr);
+            align-items: baseline;
+            gap: 1.4mm;
+            margin-top: 2mm;
+            font-weight: 900;
+        }
+
+        .bdh-place-date .place {
+            min-width: 31mm;
+            margin-left: 1mm;
+            margin-right: 1mm;
+        }
+
+        .bdh-document strong {
+            font-weight: 900;
+        }
+
+        .bdh-document .editable {
+            display: inline-block;
+            min-height: 5.2mm;
+            padding: 0 1mm;
+            border: 0;
+            background: transparent;
+            font-weight: 800;
+            line-height: 1.25;
+            outline: none;
+            vertical-align: baseline;
+        }
+
+        .bdh-document .editable:focus {
+            background: rgba(8, 121, 189, .16);
+            box-shadow: inset 0 -2px 0 #0879bd;
+        }
+
+        .bdh-document .editable.name {
+            width: 72mm;
+            min-width: 72mm;
+            margin: 0 1.5mm;
+            border-bottom: 1px solid #111;
+        }
+
+        .bdh-document .editable.id {
+            width: 34mm;
+            min-width: 34mm;
+            margin-left: 1.5mm;
+            text-align: center;
+            border-bottom: 1px solid #111;
+        }
+
+        .bdh-document .editable.id:empty::before {
+            content: attr(data-placeholder);
+            color: transparent;
+            white-space: pre;
+        }
+
+        .bdh-document .editable.account {
+            min-width: 30mm;
+            color: #000;
+            font-size: 18px;
+            font-weight: 900;
+            text-align: center;
+        }
+
+        .bdh-document .editable.benefit-account {
+            min-width: 45mm;
+            text-align: center;
+        }
+
+        .bdh-document .editable.date {
+            width: 100%;
+            min-width: 45mm;
+        }
+
+        .bdh-signature-row {
+            display: grid;
+            grid-template-columns: 92mm 45mm;
+            align-items: end;
+            column-gap: 22mm;
+            margin: 18mm 0 6mm 5mm;
+        }
+
+        .bdh-stamp {
+            width: 42mm;
+            height: 42mm;
+            object-fit: contain;
+            justify-self: end;
+        }
+
+        .bdh-signature {
+            width: 92mm;
+            margin: 0;
+        }
+
+        .bdh-signature .signature-edit {
+            display: block;
+            min-height: 9mm;
+            border-bottom: 1.6px dashed #111;
+            outline: none;
+        }
+
+        .bdh-signature .signature-name {
+            display: block;
+            min-height: 5mm;
+            padding-top: 1.5mm;
+            font-weight: 900;
+            outline: none;
+        }
+
+        .bdh-id-line {
+            margin-left: 5mm;
+            font-size: 13px;
+        }
+
+        .bdh-id-line .editable {
+            min-width: 48mm;
+        }
+
+        .no-mortuary-document {
+            position: relative;
+            min-height: 255mm;
+            padding: 4mm 5mm;
+            font-family: "Poppins", Arial, Helvetica, sans-serif;
+            color: #111;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .no-mortuary-header {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: end;
+            margin-bottom: 6mm;
+        }
+
+        .no-mortuary-header img {
+            width: 76mm;
+            height: auto;
+        }
+
+        .no-mortuary-account {
+            display: flex;
+            align-items: baseline;
+            gap: 5mm;
+            padding-right: 8mm;
+            font-size: 10px;
+            font-weight: 900;
+        }
+
+        .no-mortuary-account .editable-line {
+            min-width: 24mm;
+            color: #e20b13;
+            font-size: 17px;
+        }
+
+        .no-mortuary-title {
+            margin: 0 -5mm 7mm;
+            padding: 2mm;
+            background: #0879bd;
+            color: #fff;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .no-mortuary-document p {
+            margin: 0 0 3mm;
+        }
+
+        .no-mortuary-document .editable-line {
+            display: inline-block;
+            min-width: 48mm;
+            padding: 0 1mm;
+            border-bottom: 1px solid transparent;
+            font-weight: 800;
+            outline: none;
+        }
+
+        .no-mortuary-document .editable-line.short {
+            min-width: 28mm;
+        }
+
+        .no-mortuary-document p[style*="text-align:center"] .editable-line.short {
+            min-width: 42mm;
+            text-align: left;
+        }
+
+        .no-mortuary-document .editable-line:focus,
+        .no-mortuary-check:focus {
+            background: rgba(8, 121, 189, .14);
+            border-bottom-color: #0879bd;
+        }
+
+        .no-mortuary-intro {
+            display: grid;
+            grid-template-columns: auto minmax(50mm, 1fr) auto;
+            align-items: baseline;
+            gap: 2mm;
+        }
+
+        .no-mortuary-reasons {
+            display: grid;
+            gap: 1.6mm;
+            margin: 2mm 0 3mm;
+        }
+
+        .no-mortuary-reason {
+            display: grid;
+            grid-template-columns: 7mm 1fr;
+            align-items: baseline;
+        }
+
+        .no-mortuary-check {
+            min-height: 5mm;
+            font-weight: 900;
+            text-align: center;
+            outline: none;
+        }
+
+        .no-mortuary-date {
+            display: flex;
+            align-items: baseline;
+            gap: 2mm;
+            font-weight: 800;
+        }
+
+        .no-mortuary-signature {
+            width: 72mm;
+            margin: 27mm 0 0;
+        }
+
+        .no-mortuary-signature .signature-space {
+            display: block;
+            min-height: 13mm;
+            border-bottom: 1.4px dashed #111;
+            outline: none;
+        }
+
+        .no-mortuary-signature .signature-name {
+            display: block;
+            padding-top: 2mm;
+            font-weight: 900;
+            outline: none;
+        }
+
+        .no-mortuary-signature .signature-id {
+            display: flex;
+            gap: 3mm;
+            align-items: baseline;
+            margin-top: 1mm;
+            font-weight: 900;
+        }
+
+        .no-mortuary-signature .signature-id .editable-line {
+            min-width: 30mm;
+            font-weight: 500;
+        }
+
+        .mortuary-copy {
+            margin-top: 2mm;
+            text-align: justify;
+        }
+
+        .mortuary-health {
+            display: grid;
+            gap: 2mm;
+            margin-top: 3mm;
+        }
+
+        .mortuary-health p {
+            margin: 0;
+        }
+
+        .mortuary-beneficiary {
+            width: 86%;
+            margin-top: 4mm;
+            border-collapse: collapse;
+        }
+
+        .mortuary-beneficiary caption {
+            padding-bottom: 1mm;
+            font-weight: 800;
+            text-align: left;
+        }
+
+        .mortuary-beneficiary td {
+            height: 7mm;
+            padding: 1mm 2mm;
+            border: 1px solid #111;
+        }
+
+        .mortuary-beneficiary td:first-child {
+            width: 34mm;
+            font-weight: 700;
+        }
+
+        .mortuary-signature-row {
+            display: grid;
+            grid-template-columns: 78mm 42mm;
+            align-items: end;
+            gap: 22mm;
+            margin-top: 12mm;
+        }
+
+        .mortuary-signature-row .no-mortuary-signature {
+            width: 72mm;
+            margin: 0;
+        }
+
+        .mortuary-seal {
+            width: 38mm;
+            height: auto;
+        }
+
+        .brand-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 12px;
+        }
+
+        .brand-row img {
+            width: 56mm;
+            height: auto;
+        }
+
+        .brand-line {
+            flex: 1;
+            height: 4px;
+            margin-top: 12mm;
+            background: #147fbe;
+        }
+
+        h1 {
+            margin: 6mm 0 12mm;
+            text-align: center;
+            font-size: 18px;
+            letter-spacing: .3px;
+        }
+
+        p {
+            margin: 0 0 4.2mm;
+            font-size: 12px;
+            line-height: 1.42;
+        }
+
+        strong {
+            font-weight: 800;
+        }
+
+        .editable {
+            display: inline-block;
+            min-width: 32mm;
+            padding: 0 1.5mm;
+            border-bottom: 1px solid #161d26;
+            font-weight: 800;
+            line-height: 1.25;
+            outline: none;
+        }
+
+        .editable.short {
+            min-width: 10mm;
+            text-align: center;
+        }
+
+        .editable.medium {
+            min-width: 24mm;
+            text-align: center;
+        }
+
+        .editable.long {
+            min-width: 122mm;
+        }
+
+        .letter-date {
+            margin-left: 42mm;
+            margin-bottom: 14mm;
+            white-space: nowrap;
+        }
+
+        .signature {
+            margin-top: 14mm;
+            text-align: center;
+        }
+
+        .signature span {
+            display: inline-block;
+            min-width: 54mm;
+            border-top: 1px solid #161d26;
+            padding-top: 2mm;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .footer-strip {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 10mm;
+            background: linear-gradient(90deg, #00a66c 0 58%, #147fbe 58% 100%);
+        }
+
+        .watermark {
+            position: absolute;
+            left: -34mm;
+            bottom: -28mm;
+            width: 72mm;
+            height: 72mm;
+            border: 9mm solid #e7f1f8;
+            border-radius: 50%;
+        }
+
+        .firm-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5mm;
+            font-size: 11px;
+        }
+
+        .firm-table th,
+        .firm-table td {
+            border: 1.5px solid #111827;
+            padding: 2.2mm;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        .firm-table th {
+            width: 38%;
+            font-weight: 800;
+        }
+
+        .firm-box {
+            height: 34mm;
+            text-align: center;
+        }
+
+        .firm-box.large {
+            height: 48mm;
+        }
+
+        .exclusive {
+            margin-top: 5mm;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .signature-register-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: start;
+            margin-bottom: 7mm;
+        }
+
+        .signature-register-header h1 {
+            margin: 6mm 0 0;
+            text-align: left;
+            font-size: 16px;
+            line-height: 1.2;
+        }
+
+        .signature-register-header img {
+            width: 46mm;
+            justify-self: center;
+        }
+
+        .signature-register .firm-table {
+            margin-top: 4mm;
+            font-size: 10px;
+        }
+
+        .signature-register .firm-table th,
+        .signature-register .firm-table td {
+            border: 1.5px solid #111;
+            padding: 1.7mm;
+        }
+
+        .signature-register .firm-table th {
+            width: 37%;
+        }
+
+        .signature-register .firm-box {
+            height: 31mm;
+        }
+
+        .signature-register .firm-box.large {
+            height: 43mm;
+        }
+
+        .signature-register .joint-signatures {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            height: 43mm;
+            margin: -1.7mm;
+        }
+
+        .signature-register .joint-signatures div {
+            display: flex;
+            align-items: flex-end;
+            padding: 1.7mm;
+        }
+
+        .signature-register .joint-signatures div + div {
+            border-top: 1.5px solid #111;
+        }
+
+        .signature-register .notice {
+            margin-top: 4mm;
+            font-size: 9.5px;
+            line-height: 1.35;
+        }
+
+        .generic-box {
+            border: 1.5px solid #111827;
+            padding: 8mm;
+            min-height: 120mm;
+        }
+
+        .contribution-certificate {
+            position: relative;
+            min-height: 297mm;
+            padding: 43mm 14mm 25mm;
+            color: #17202a;
+        }
+
+        .contribution-certificate h1 {
+            position: relative;
+            margin: 0;
+            padding: 3.2mm 2mm 2.8mm;
+            background: #087fc3;
+            color: #fff;
+            font-size: 26px;
+            line-height: 1.05;
+            text-align: center;
+            letter-spacing: 0;
+        }
+
+        .contribution-certificate h1::after {
+            position: absolute;
+            right: 0;
+            bottom: -1.7mm;
+            left: 0;
+            height: .7mm;
+            background: #00a86b;
+            content: "";
+        }
+
+        .certificate-office {
+            margin: 10mm 0 36mm;
+            text-align: center;
+        }
+
+        .certificate-office strong,
+        .certificate-office span {
+            display: block;
+        }
+
+        .certificate-office strong {
+            margin-bottom: .5mm;
+            font-size: 17px;
+            line-height: 1.1;
+        }
+
+        .certificate-office span {
+            font-size: 8px;
+            line-height: 1.2;
+        }
+
+        .certificate-copy {
+            margin: 0 auto 18mm;
+            max-width: 166mm;
+            font-size: 11.5px;
+            line-height: 1.25;
+            text-align: justify;
+        }
+
+        .certificate-beneficiary {
+            margin: 0 auto;
+            width: 158mm;
+            font-size: 11.5px;
+            text-align: center;
+        }
+
+        .certificate-beneficiary > span:first-child {
+            display: block;
+        }
+
+        .certificate-beneficiary-name {
+            display: block;
+            width: 110mm;
+            min-height: 6mm;
+            margin: 17mm auto 0;
+            border-bottom: 1px solid #17202a;
+            font-weight: 600;
+        }
+
+        .certificate-beneficiary-id {
+            display: flex;
+            align-items: end;
+            justify-content: center;
+            gap: 2mm;
+            margin-top: 1.5mm;
+            font-weight: 700;
+        }
+
+        .certificate-beneficiary-id .certificate-field {
+            width: 30mm;
+        }
+
+        .certificate-account-fields {
+            display: grid;
+            grid-template-columns: 60mm 1fr;
+            gap: 2mm 3mm;
+            width: 160mm;
+            margin: 13mm auto 0;
+            font-size: 11.5px;
+        }
+
+        .certificate-account-fields strong {
+            align-self: end;
+            text-align: right;
+        }
+
+        .certificate-field {
+            display: inline-block;
+            min-width: 18mm;
+            min-height: 4.5mm;
+            padding: .2mm 2mm;
+            border-bottom: 1px solid #17202a;
+            font-weight: 600;
+        }
+
+        .certificate-date {
+            margin: 13mm 0 0;
+            text-align: center;
+            font-size: 10.5px;
+        }
+
+        .certificate-date .certificate-field {
+            min-width: 11mm;
+            padding-inline: 1mm;
+            text-align: center;
+        }
+
+        .certificate-signatures {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18mm;
+            margin: 32mm 6mm 0;
+            text-align: center;
+            font-size: 9.5px;
+        }
+
+        .certificate-signatures div {
+            padding-top: 2mm;
+            border-top: 1px solid #17202a;
+        }
+
+        .certificate-signatures strong,
+        .certificate-signatures span {
+            display: block;
+        }
+
+        .generic-row {
+            display: grid;
+            grid-template-columns: 46mm 1fr;
+            gap: 4mm;
+            margin-bottom: 5mm;
+            font-size: 12px;
+        }
+
+        .check {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 6mm;
+            height: 6mm;
+            border: 1px solid #161d26;
+            margin-right: 2mm;
+            font-weight: 800;
+        }
+
+        @media print {
+            body {
+                background: #fff;
+            }
+
+            .toolbar {
+                display: none;
+            }
+
+            .edit-hint {
+                display: none;
+            }
+
+            .page {
+                margin: 0;
+                box-shadow: none;
+            }
+
+            .editable {
+                outline: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button type="button" onclick="window.print()">Guardar o imprimir PDF</button>
+        <button type="button" onclick="window.close()">Cerrar</button>
+    </div>
+
+    <main class="page pdf-template ">
+        
+                    <img class="template-bg" src="http://localhost/sistema_interno/public/formatos/Fondo_page-0001.jpg" alt="">
+            <section class="contribution-certificate" aria-label="Certificado de aportación editable">
+                <h1>CERTIFICADO DE APORTACIÓN</h1>
+
+                <div class="certificate-office">
+                    <strong>MATRIZ LAS NAVES</strong>
+                    <span>Dir: Calle 10 de octubre y 10 de Agosto</span>
+                    <span>Permiso de Funcionamiento: SEPS-INFERS-DNGRF-TF-2022-0534</span>
+                    <span>Código de Oficina: 0495</span>
+                    <span>Fecha de Registro: 2022-08-04</span>
+                </div>
+
+                <p class="certificate-copy">
+                    La Cooperativa de Ahorro y Crédito Las Naves Ltda. creada mediante acuerdo ministerial 000365
+                    e inscrita en el Registro Oficial de Cooperativas el 10 de junio de 1982, emite el presente
+                    <strong>CERTIFICADO DE APORTACIÓN</strong>:
+                </p>
+
+                <div class="certificate-beneficiary">
+                    <span>A favor de:</span>
+                    <span class="certificate-beneficiary-name" contenteditable="true" spellcheck="false"></span>
+                    <span class="certificate-beneficiary-id">
+                        <strong>C.I.:</strong>
+                        <span class="certificate-field" contenteditable="true" spellcheck="false"></span>
+                    </span>
+                </div>
+
+                <div class="certificate-account-fields">
+                    <strong>Por un valor nominal de:</strong>
+                    <span class="certificate-field" contenteditable="true" spellcheck="false"></span>
+
+                    <strong>Número de cuenta:</strong>
+                    <span class="certificate-field" contenteditable="true" spellcheck="false"></span>
+                </div>
+
+                <p class="certificate-date">
+                    Las Naves,
+                    <span class="certificate-field" contenteditable="true" spellcheck="false"></span>
+                    de <span class="certificate-field" contenteditable="true" spellcheck="false"></span>
+                    de <span class="certificate-field" contenteditable="true" spellcheck="false">2026</span>
+                </p>
+
+                <div class="certificate-signatures">
+                    <div>
+                        <strong>LCDA. NANCY ALEGRÍA SUAREZ</strong>
+                        <span>PRESIDENTE</span>
+                    </div>
+                    <div>
+                        <strong>ING. HITER MERA SANTANA</strong>
+                        <span>GERENTE</span>
+                    </div>
+                </div>
+            </section>
+            </main>
+</body>
+</html>

@@ -364,6 +364,111 @@ a:hover { text-decoration: underline; }
   font-size: 12px;
 }
 
+.data-update-create {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.data-update-create label:not(.check),
+.compare-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 750;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.span-3 {
+  grid-column: span 3;
+}
+
+.choice-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--subtle);
+}
+
+.choice-panel legend {
+  padding: 0 6px;
+  font-weight: 850;
+}
+
+.table-list {
+  display: grid;
+  gap: 8px;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 1fr 150px 1.2fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--subtle);
+  color: var(--ink);
+}
+
+.table-row:hover {
+  border-color: var(--blue);
+  text-decoration: none;
+}
+
+.compare-form {
+  display: grid;
+  grid-template-columns: 220px repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.compare-head {
+  padding: 9px 10px;
+  border-radius: 6px;
+  background: var(--blue-soft);
+  color: var(--blue-strong);
+  font-weight: 850;
+}
+
+.compare-label {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid #e5eff5;
+  border-radius: 6px;
+  background: var(--subtle);
+  font-weight: 800;
+}
+
+.mini-checklist {
+  width: 100%;
+  margin: 18px 0;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.mini-checklist th,
+.mini-checklist td {
+  border: 1px solid #1c2d38;
+  padding: 8px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.mini-checklist th {
+  background: #f4f8fb;
+  font-weight: 850;
+}
+
 .process-card,
 .account-type-card {
   display: grid;
@@ -378,8 +483,8 @@ a:hover { text-decoration: underline; }
 }
 
 .account-type-card {
-  min-height: 680px;
-  grid-template-rows: 132px auto minmax(260px, 1fr) auto;
+  min-height: 590px;
+  grid-template-rows: 132px minmax(260px, 1fr) auto;
 }
 
 .account-card-head {
@@ -768,6 +873,48 @@ select:focus {
 
 .step-guidance strong {
   color: var(--ink);
+}
+
+.file-name-step {
+  max-width: 820px;
+}
+
+.file-name-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px 12px;
+}
+
+.file-name-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 800;
+}
+
+.file-name-form .hint {
+  grid-column: 1 / -1;
+}
+
+.confirmed-file-name {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid #bfe5d9;
+  border-radius: 8px;
+  background: #f2fbf7;
+}
+
+.confirmed-file-name span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.confirmed-file-name strong {
+  font-size: 22px;
 }
 
 .consent-actions .button {
@@ -1180,11 +1327,23 @@ pre {
   .check-item,
   .check-item form,
   .account-type-grid,
+  .data-update-create,
+  .compare-form,
+  .table-row,
   .external-grid {
     grid-template-columns: 1fr;
   }
 
+  .span-2,
+  .span-3 {
+    grid-column: auto;
+  }
+
   .agency-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .file-name-form {
     grid-template-columns: 1fr;
   }
 
@@ -1391,7 +1550,7 @@ pre {
 
 .official-checklist {
   width: 100%;
-  min-width: 980px;
+  min-width: 720px;
   border-collapse: collapse;
   table-layout: fixed;
   color: #071426;

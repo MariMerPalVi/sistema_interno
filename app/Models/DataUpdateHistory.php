@@ -23,4 +23,9 @@ class DataUpdateHistory extends Model
     {
         return $this->belongsTo(DataUpdateProcess::class, 'data_update_process_id');
     }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 }

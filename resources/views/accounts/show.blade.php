@@ -40,17 +40,27 @@
     $requiredInternalIds = $internalTemplates->where('is_required', true)->pluck('id');
     $loadedInternalIds = $opening->documents->where('document_scope', 'interno')->whereIn('status', ['cargado', 'validado'])->pluck('internal_document_template_id');
     $internalComplete = $requiredInternalIds->diff($loadedInternalIds)->isEmpty();
-    $servicesComplete = $opening->histories->contains('action', 'seleccionar_servicios');
+    $servicesSelectionSaved = $opening->histories->contains('action', 'seleccionar_servicios');
     $serviceTemplatesBySlug = $serviceTemplates->keyBy('slug');
     $fondoDecision = data_get(
         $opening->histories->where('action', 'seleccionar_servicios')->sortByDesc('id')->first()?->metadata,
         'fondo_mortuorio'
     );
+    $membershipDecision = data_get(
+        $opening->histories->where('action', 'seleccionar_servicios')->sortByDesc('id')->first()?->metadata,
+        'tipo_vinculacion'
+    );
+    $contributionCertificateApplies = in_array($opening->accountType->slug, ['cuenta-ahorro-programado', 'cuenta-juridica'], true);
+    $servicesComplete = $servicesSelectionSaved
+        && (!$contributionCertificateApplies || in_array($membershipDecision, ['socio', 'cliente'], true));
     $selectedServiceTemplateSlugs = collect();
     if ($fondoDecision === 'si') {
         $selectedServiceTemplateSlugs->push($serviceTemplatesBySlug->get('formulario-servicio-fondo-mortuorio')?->id);
     } elseif ($fondoDecision === 'no') {
         $selectedServiceTemplateSlugs->push($serviceTemplatesBySlug->get('sin-fondo-mortuorio')?->id);
+    }
+    if ($contributionCertificateApplies && $membershipDecision === 'socio') {
+        $selectedServiceTemplateSlugs->push($serviceTemplatesBySlug->get('certificado-de-aportacion')?->id);
     }
     $selectedServiceTemplateIds = $selectedServiceTemplateSlugs->filter()->unique()->values();
     $selectedServiceDocumentTemplates = $serviceTemplates->whereIn('id', $selectedServiceTemplateIds);
@@ -61,9 +71,10 @@
         'consentimiento' => '1. Consentimiento',
         'requisitos' => '2. Requisitos',
         'externas' => '3. Consultas',
-        'internos' => '4. Internos',
-        'servicios' => '5. Servicios',
-        'resumen' => '6. Check List',
+        'expediente' => '4. Expediente',
+        'internos' => '5. Internos',
+        'servicios' => '6. Servicios',
+        'resumen' => '7. Check List',
     ];
     $storageRoot = storage_path('app/private');
     $expedientStoragePath = $storageRoot.DIRECTORY_SEPARATOR.'aperturas'.DIRECTORY_SEPARATOR.str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $opening->storage_folder);
@@ -81,7 +92,7 @@
             <p class="eyebrow">{{ $opening->public_code }}</p>
             <h1>{{ $opening->accountType->name }}</h1>
             <div class="opening-meta">
-                <span class="hint">{{ $opening->file_name }}</span>
+                <span class="hint">{{ $opening->file_name_confirmed ? $opening->file_name : 'Nombre pendiente' }}</span>
                 <span class="agency-label"><i data-lucide="building-2"></i> {{ $agencyName }}</span>
             </div>
         </div>
@@ -311,8 +322,37 @@
         </form>
         @if ($externalComplete)
             <div class="actions">
-                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'internos']) }}">Continuar <i data-lucide="arrow-right"></i></a>
+                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'expediente']) }}">Continuar <i data-lucide="arrow-right"></i></a>
             </div>
+        @endif
+    </section>
+    @endif
+
+    @if ($activeStep === 'expediente')
+    <section id="expediente" class="panel file-name-step">
+        <div class="panel-head">
+            <h2 class="panel-title"><i data-lucide="folder-plus"></i> Nombre definitivo del expediente</h2>
+            @include('partials.badge', ['status' => $opening->file_name_confirmed ? 'validado' : 'pendiente'])
+        </div>
+        <div class="step-guidance">
+            <i data-lucide="clipboard-check"></i>
+            <span>Ingrese el número de cuenta o nombre definitivo con el que se guardará el expediente. El sistema renombrará automáticamente la carpeta y los documentos cargados hasta este momento.</span>
+        </div>
+        @if ($opening->file_name_confirmed)
+            <div class="confirmed-file-name">
+                <span>Expediente</span>
+                <strong>{{ $opening->file_name }}</strong>
+            </div>
+            <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'internos']) }}">Continuar <i data-lucide="arrow-right"></i></a>
+        @else
+            <form class="file-name-form" method="post" action="{{ route('accounts.file-name.update', $opening) }}">
+                @csrf
+                <label>Número o nombre del expediente
+                    <input name="file_name" value="{{ old('file_name') }}" placeholder="Ej. 14115" maxlength="120" required autofocus>
+                </label>
+                <small class="hint">Debe ser único en toda la cooperativa. Después de guardarlo no podrá modificarse desde este proceso.</small>
+                <button class="button primary" type="submit"><i data-lucide="save"></i> Guardar nombre y renombrar archivos</button>
+            </form>
         @endif
     </section>
     @endif
@@ -404,6 +444,13 @@
                     <label><input type="radio" name="fondo_mortuorio" value="si" @checked($fondoDecision === 'si') required> Sí</label>
                     <label><input type="radio" name="fondo_mortuorio" value="no" @checked($fondoDecision === 'no') required> No</label>
                 </fieldset>
+                @if ($contributionCertificateApplies)
+                    <fieldset class="service-option service-decision">
+                        <legend>Tipo de vinculación</legend>
+                        <label><input type="radio" name="tipo_vinculacion" value="socio" @checked($membershipDecision === 'socio') required> Socio</label>
+                        <label><input type="radio" name="tipo_vinculacion" value="cliente" @checked($membershipDecision === 'cliente') required> Cliente</label>
+                    </fieldset>
+                @endif
             </div>
             <div class="actions">
                 <button class="button primary" type="submit"><i data-lucide="save"></i> Guardar servicios</button>
@@ -474,32 +521,27 @@
             <table class="official-checklist">
                 <tbody>
                     <tr class="official-head">
-                        <td colspan="6">
+                        <td colspan="4">
                             <strong>CHECK LIST DE DOCUMENTOS DE LA APERTURA DE CUENTA</strong>
                             <span>ARCHIVO FISICO</span>
                         </td>
-                        <td colspan="6" class="official-logo"><img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves"></td>
+                        <td colspan="3" class="official-logo"><img src="{{ asset('images/logo-las-naves.png') }}" alt="Las Naves"></td>
                     </tr>
                     <tr>
-                        <td colspan="6" class="socio-label">SOCIO N°</td>
-                        <td colspan="6" class="socio-number">{{ $opening->file_name }}</td>
+                        <td colspan="4" class="socio-label">SOCIO N°</td>
+                        <td colspan="3" class="socio-number">{{ $opening->file_name }}</td>
                     </tr>
                     <tr>
-                        <td colspan="6" class="socio-label">AGENCIA</td>
-                        <td colspan="6" class="socio-number">{{ $agencyName }}</td>
+                        <td colspan="4" class="socio-label">AGENCIA</td>
+                        <td colspan="3" class="socio-number">{{ $agencyName }}</td>
                     </tr>
                     <tr class="section-row">
                         <td colspan="6">{{ str_contains(strtolower($opening->accountType->name), 'jurid') ? 'PERSONAS JURIDICAS' : 'PERSONAS NATURALES' }}</td>
                         <td>Asis.<br>Op</td>
-                        <td>Jefe<br>Cap</td>
-                        <td>Cump.</td>
-                        <td>Riesg.</td>
-                        <td>C. Vig</td>
-                        <td>A.<br>Ext/Int</td>
                     </tr>
 
                     <tr class="section-row">
-                        <td colspan="12">DOCUMENTOS DEL EXPEDIENTE EN ORDEN</td>
+                        <td colspan="7">DOCUMENTOS DEL EXPEDIENTE EN ORDEN</td>
                     </tr>
 
                     @foreach ($checklistRows as $index => $row)
@@ -512,33 +554,42 @@
                                 @endif
                             </td>
                             <td>{{ $row['loaded'] ? 'X' : '' }}</td>
-                            <td></td><td></td><td></td><td></td><td></td>
                         </tr>
                     @endforeach
 
                     <tr class="path-row">
-                        <td colspan="12"><strong>Ruta del expediente:</strong> {{ $expedientStoragePath }}</td>
+                        <td colspan="7"><strong>Ruta del expediente:</strong> {{ $expedientStoragePath }}</td>
                     </tr>
                     <tr class="signature-row">
-                        <td colspan="6">Observaciones:</td>
-                        <td colspan="6">Firma:</td>
+                        <td colspan="4">Observaciones:</td>
+                        <td colspan="3">Firma:</td>
                     </tr>
-                    <tr><td colspan="6">Asistente Operativo</td><td colspan="6">Fecha</td></tr>
+                    <tr><td colspan="4">Asistente Operativo</td><td colspan="3">Fecha</td></tr>
                     <tr class="signature-row">
-                        <td colspan="6">Observaciones:</td>
-                        <td colspan="6">Firma:</td>
+                        <td colspan="4">Observaciones:</td>
+                        <td colspan="3">Firma:</td>
                     </tr>
-                    <tr><td colspan="6">Jefe de Captaciones</td><td colspan="6">Fecha</td></tr>
+                    <tr><td colspan="4">Jefe de Captaciones</td><td colspan="3">Fecha</td></tr>
                     <tr class="signature-row">
-                        <td colspan="6">Observaciones:</td>
-                        <td colspan="6">Firma:</td>
+                        <td colspan="4">Observaciones:</td>
+                        <td colspan="3">Firma:</td>
                     </tr>
-                    <tr><td colspan="6">Oficial de Cumplimiento</td><td colspan="6">Fecha</td></tr>
+                    <tr><td colspan="4">Oficial de Cumplimiento</td><td colspan="3">Fecha</td></tr>
                     <tr class="signature-row">
-                        <td colspan="6">Observaciones:</td>
-                        <td colspan="6">Firma:</td>
+                        <td colspan="4">Observaciones:</td>
+                        <td colspan="3">Firma:</td>
                     </tr>
-                    <tr><td colspan="6">Administrador de Riesgos</td><td colspan="6">Fecha</td></tr>
+                    <tr><td colspan="4">Administrador de Riesgos</td><td colspan="3">Fecha</td></tr>
+                    <tr class="signature-row">
+                        <td colspan="4">Observaciones:</td>
+                        <td colspan="3">Firma:</td>
+                    </tr>
+                    <tr><td colspan="4">Consejo de Vigilancia</td><td colspan="3">Fecha</td></tr>
+                    <tr class="signature-row">
+                        <td colspan="4">Observaciones:</td>
+                        <td colspan="3">Firma:</td>
+                    </tr>
+                    <tr><td colspan="4">Auditoría Externa/Interna</td><td colspan="3">Fecha</td></tr>
                 </tbody>
             </table>
         </div>

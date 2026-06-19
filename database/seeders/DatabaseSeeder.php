@@ -31,7 +31,7 @@ class DatabaseSeeder extends Seeder
         User::where('email', 'asesor@cooperativa.local')->delete();
 
         foreach ([
-            ['Administrador', 'administrador', 'administrador@cooperativa.local', 'administrador', 'matriz-las-naves'],
+            ['Administrador', ' ', 'administrador@cooperativa.local', 'administrador', 'matriz-las-naves'],
             ['Matriz - Las Naves', 'matriz', 'matriz@cooperativa.local', 'asesor', 'matriz-las-naves'],
             ['Echeandía', 'echeandia', 'echeandia@cooperativa.local', 'asesor', 'echeandia'],
             ['Caluma', 'caluma', 'caluma@cooperativa.local', 'asesor', 'caluma'],
@@ -39,23 +39,24 @@ class DatabaseSeeder extends Seeder
             ['Montalvo', 'montalvo', 'montalvo@cooperativa.local', 'asesor', 'montalvo'],
             ['Quinsaloma', 'quinsaloma', 'quinsaloma@cooperativa.local', 'asesor', 'quinsaloma'],
         ] as [$name, $username, $email, $role, $agency]) {
-            User::updateOrCreate(
-                ['email' => $email],
-                [
-                    'username' => $username,
-                    'role_id' => $roles->firstWhere('name', $role)->id,
-                    'agency' => $agency,
-                    'name' => $name,
-                    'password' => Hash::make('Cambio123!'),
-                    'active' => true,
-                ]
-            );
+            $user = User::firstOrNew(['email' => $email]);
+            $user->fill([
+                'username' => $username,
+                'role_id' => $roles->firstWhere('name', $role)->id,
+                'agency' => $agency,
+                'name' => $name,
+                'active' => true,
+            ]);
+            if (!$user->exists) {
+                $user->password = Hash::make('Cambio123!');
+            }
+            $user->save();
         }
 
         foreach ([
             ['Apertura de cuentas', 'apertura-cuentas', 'Creación y revisión de expedientes para nuevos socios.', true, 'accounts.create', 'folder-plus'],
             ['Solicitud de crédito', 'solicitud-credito', 'Proceso visual reservado para futuras fases.', false, null, 'badge-dollar-sign'],
-            ['Actualización de datos', 'actualizacion-datos', 'Proceso visual reservado para futuras fases.', false, null, 'refresh-cw'],
+            ['Actualización de datos', 'actualizacion-datos', 'Actualización de información del socio con respaldo documental y auditoría.', true, 'data-updates.index', 'refresh-cw'],
             ['Bloqueo de tarjeta', 'bloqueo-tarjeta', 'Proceso visual reservado para futuras fases.', false, null, 'shield-alert'],
             ['Emisión de certificados', 'emision-certificados', 'Proceso visual reservado para futuras fases.', false, null, 'file-check'],
             ['Reclamos o solicitudes internas', 'reclamos-solicitudes', 'Proceso visual reservado para futuras fases.', false, null, 'message-square'],
@@ -165,6 +166,7 @@ class DatabaseSeeder extends Seeder
         foreach ([
             ['Formulario del servicio de fondo mortuorio', 'formulario-servicio-fondo-mortuorio', 'formatos/CON_FONDO_MORTUORIO.pdf', 'Formulario servicio Fondo Mortuorio_{expediente}', 1],
             ['Declaración sin fondo mortuorio', 'sin-fondo-mortuorio', 'formatos/SIN_FONDO_MORTUORIO.pdf', 'Sin Fondo Mortuorio_{expediente}', 2],
+            ['Certificado de aportación', 'certificado-de-aportacion', 'formatos/CERTIFICADO_2026.pdf', 'Certificado de aportacion_{expediente}', 3],
         ] as [$name, $slug, $templatePath, $pattern, $order]) {
             InternalDocumentTemplate::updateOrCreate(['slug' => $slug], [
                 'account_type_id' => null,

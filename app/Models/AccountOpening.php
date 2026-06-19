@@ -12,6 +12,7 @@ class AccountOpening extends Model
     protected $fillable = [
         'public_code',
         'file_name',
+        'file_name_confirmed',
         'storage_folder',
         'agency',
         'requires_spouse_documents',
@@ -51,6 +52,7 @@ class AccountOpening extends Model
 
     protected $casts = [
         'extracted_data' => 'array',
+        'file_name_confirmed' => 'boolean',
         'requires_spouse_documents' => 'boolean',
         'submitted_at' => 'datetime',
         'ai_review_result' => 'array',

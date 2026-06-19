@@ -29,12 +29,6 @@
                     <h2>{{ $type->name }}</h2>
                     <p>{{ $type->notes }}</p>
                 </div>
-                <div class="account-card-form">
-                    <label>Número o nombre único del expediente
-                        <input name="file_name" value="{{ old('file_name') }}" placeholder="Ej. 14115" required>
-                    </label>
-                    <small class="hint">No puede repetirse en ninguna agencia.</small>
-                </div>
                 <div class="requirement-box">
                     <span class="hint">Requisitos</span>
                     <ul class="requirement-list">
