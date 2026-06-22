@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   ClipboardPaste,
+  Copy,
   createIcons,
   ExternalLink,
   Eye,
@@ -30,6 +31,7 @@ createIcons({
     CheckCircle2,
     ClipboardCheck,
     ClipboardPaste,
+    Copy,
     ExternalLink,
     Eye,
     FilePenLine,
@@ -174,6 +176,44 @@ document.querySelectorAll('.external-evidence-form').forEach((form) => {
       zone.classList.add('paste-error');
       zone.focus();
       label.textContent = 'Pegue esta evidencia antes de guardar';
+    }
+  });
+});
+
+document.querySelectorAll('form[data-requires-signature="1"]').forEach((form) => {
+  form.addEventListener('submit', (event) => {
+    const confirmation = form.querySelector('input[name="manual_signature_confirmed"]');
+    if (confirmation?.checked) return;
+
+    event.preventDefault();
+    const label = form.dataset.signatureLabel || 'documento';
+    window.alert(`El ${label} debe contener una firma. Revise visualmente el archivo y marque "Firma validada" antes de continuar.`);
+    confirmation?.focus();
+  });
+});
+
+document.querySelectorAll('.copy-extracted').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const input = document.getElementById(button.dataset.copyTarget || '');
+    if (!(input instanceof HTMLInputElement)) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(input.value);
+      } else {
+        input.select();
+        document.execCommand('copy');
+      }
+
+      button.classList.add('is-copied');
+      button.title = 'Copiado';
+      window.setTimeout(() => {
+        button.classList.remove('is-copied');
+        button.title = 'Copiar';
+      }, 1200);
+    } catch {
+      input.select();
+      document.execCommand('copy');
     }
   });
 });

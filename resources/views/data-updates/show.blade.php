@@ -81,14 +81,23 @@
                             <h3>{{ $document['name'] }}</h3>
                             <p>Se guardará como: {{ str_replace('{expediente}', $update->file_name, $document['file_name']) }}</p>
                             @include('partials.badge', ['status' => $loaded?->status ?? 'pendiente'])
+                            @if ($document['requires_signature'] && $loaded && !$loaded->manual_signature_confirmed)
+                                <p class="hint"><strong>Firma pendiente:</strong> reemplace el archivo y confirme la revisión.</p>
+                            @endif
                             @if ($loaded)
                                 <p class="hint">{{ basename($loaded->file_path) }}</p>
                             @endif
                         </div>
-                        <form method="post" enctype="multipart/form-data" action="{{ route('data-updates.documents', $update) }}">
+                        <form method="post" enctype="multipart/form-data" action="{{ route('data-updates.documents', $update) }}" @if($document['requires_signature']) data-requires-signature="1" data-signature-label="{{ $document['name'] }}" @endif>
                             @csrf
                             <input type="hidden" name="document_key" value="{{ $document['key'] }}">
                             <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required>
+                            @if ($document['requires_signature'])
+                                <label class="check">
+                                    <input type="checkbox" name="manual_signature_confirmed" value="1">
+                                    Firma validada
+                                </label>
+                            @endif
                             <select name="status">
                                 <option value="cargado">Cargado</option>
                                 <option value="validado">Validado</option>

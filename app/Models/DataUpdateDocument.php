@@ -16,8 +16,13 @@ class DataUpdateDocument extends Model
         'mime_type',
         'file_size',
         'status',
+        'manual_signature_confirmed',
         'observations',
         'uploaded_by',
+    ];
+
+    protected $casts = [
+        'manual_signature_confirmed' => 'boolean',
     ];
 
     public function process(): BelongsTo

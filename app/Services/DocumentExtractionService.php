@@ -134,11 +134,14 @@ class DocumentExtractionService
     {
         $ids = $this->validEcuadorianIds($text);
         $fullName = $this->extractPersonName($text);
+        [$lastNames, $firstNames] = $this->splitEcuadorianName($fullName);
 
         return [
             'cedula' => $ids[0] ?? null,
             'cedula_valida' => isset($ids[0]),
             'nombres_apellidos' => $fullName,
+            'nombres' => $firstNames,
+            'apellidos' => $lastNames,
             'nacionalidad' => $this->matchFirst($text, [
                 '/NACIONALIDAD\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ ]{4,40})/',
                 '/\b(ECUATORIANA|ECUATORIANO|COLOMBIANA|COLOMBIANO|VENEZOLANA|VENEZOLANO)\b/',
@@ -172,6 +175,7 @@ class DocumentExtractionService
     {
         return [
             'direccion' => $this->matchFirst($text, [
+                '/UNIDAD\s+DE\s+LECTURA\s+\S+\s+(.{12,220}?)\s+1\.\s*INFORMACI[ÓO]N/isu',
                 '/((?:VIA|AV\.?|CALLE|CDLA\.?|BARRIO|RECINTO|CIUDADELA)\s+[A-ZÁÉÍÓÚÑ0-9 .\/-]{12,180}(?:LAS NAVES|GUARANDA|GUAYAQUIL|QUITO|AMBATO|RIOBAMBA|CUENCA|MILAGRO|BABAHOYO)[A-ZÁÉÍÓÚÑ0-9 .\/-]*)/si',
                 '/(?:UNIDAD|IJNIDAD)\s+DE\s+LECTURA\s+[A-Z0-9]+\s+(.+?)\s+1\.\s*INFORMACI[ÓO]N/si',
                 '/DIRECCI[ÓO]N\s+SERVICIO\s+(.+?)\s+CONCEPTO/si',
@@ -285,6 +289,25 @@ class DocumentExtractionService
         $tokens = array_values(array_filter(explode(' ', $name), fn (string $token) => mb_strlen($token) >= 2));
 
         return count($tokens) >= 2 && count($tokens) <= 7;
+    }
+
+    private function splitEcuadorianName(?string $fullName): array
+    {
+        if (!$fullName) {
+            return [null, null];
+        }
+
+        $parts = array_values(array_filter(explode(' ', trim($fullName))));
+        if (count($parts) < 2) {
+            return [null, $fullName];
+        }
+
+        $lastNameCount = count($parts) >= 3 ? 2 : 1;
+
+        return [
+            implode(' ', array_slice($parts, 0, $lastNameCount)),
+            implode(' ', array_slice($parts, $lastNameCount)),
+        ];
     }
 
     private function validEcuadorianIds(string $text): array

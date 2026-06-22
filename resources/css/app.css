@@ -1198,6 +1198,47 @@ pre {
   font-weight: 800;
 }
 
+.extracted-value {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  gap: 8px;
+  align-items: center;
+}
+
+.extracted-value input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--subtle);
+  color: var(--ink);
+  font: inherit;
+}
+
+.copy-extracted {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #9fcfca;
+  border-radius: 5px;
+  background: #e8f6f3;
+  color: var(--primary);
+}
+
+.copy-extracted svg {
+  width: 17px;
+  height: 17px;
+}
+
+.extract-action {
+  display: inline-flex;
+  margin-top: 10px;
+}
+
 .service-grid,
 .summary-grid {
   display: grid;

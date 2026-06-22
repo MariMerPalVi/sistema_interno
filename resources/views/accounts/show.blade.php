@@ -147,11 +147,11 @@
                 <iframe src="{{ route('accounts.consent.preview', $opening) }}" title="Vista previa del consentimiento firmado"></iframe>
             </div>
         @endif
-        <form class="upload-row" method="post" enctype="multipart/form-data" action="{{ route('accounts.consent.upload', $opening) }}">
+        <form class="upload-row" method="post" enctype="multipart/form-data" action="{{ route('accounts.consent.upload', $opening) }}" data-requires-signature="1" data-signature-label="consentimiento de datos personales">
             @csrf
             <input type="file" name="signed_file" accept=".pdf,.jpg,.jpeg,.png" required>
             <label class="check consent-signature-check" title="Confirme que revisó visualmente la firma">
-                <input type="checkbox" name="manual_signature_confirmed" value="1" required>
+                <input type="checkbox" name="manual_signature_confirmed" value="1">
                 Firma revisada
             </label>
             <input name="observations" placeholder="Observación">
@@ -209,11 +209,16 @@
                         @if ($doc?->extracted_data)
                             @php
                                 $data = $doc->extracted_data;
-                                $name = $data['nombres_apellidos'] ?? trim(($data['nombres'] ?? '').' '.($data['apellidos'] ?? ''));
+                                $fullName = trim((string) ($data['nombres_apellidos'] ?? ''));
+                                $nameParts = preg_split('/\s+/', $fullName, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                                $lastNameCount = count($nameParts) >= 3 ? 2 : 1;
+                                $fallbackLastNames = $fullName ? implode(' ', array_slice($nameParts, 0, $lastNameCount)) : null;
+                                $fallbackFirstNames = $fullName ? implode(' ', array_slice($nameParts, $lastNameCount)) : null;
                                 $fields = match ($requirement->type->slug) {
                                     'cedula-papeleta', 'cedula' => [
                                         'Número de cédula' => $data['cedula'] ?? null,
-                                        'Nombre y apellido' => $name ?: null,
+                                        'Nombres' => $data['nombres'] ?? $fallbackFirstNames,
+                                        'Apellidos' => $data['apellidos'] ?? $fallbackLastNames,
                                     ],
                                     'planilla-servicios' => [
                                         'Dirección' => $data['direccion'] ?? null,
@@ -229,13 +234,27 @@
                             @if ($fields)
                                 <dl class="extracted-fields">
                                     @foreach ($fields as $label => $value)
+                                        @php $copyId = 'extracted-'.$doc->id.'-'.$loop->index; @endphp
                                         <div>
                                             <dt>{{ $label }}</dt>
-                                            <dd>{{ $value }}</dd>
+                                            <dd class="extracted-value">
+                                                <input id="{{ $copyId }}" value="{{ $value }}" readonly aria-label="{{ $label }} extraído">
+                                                <button class="copy-extracted" type="button" data-copy-target="{{ $copyId }}" aria-label="Copiar {{ strtolower($label) }}" title="Copiar {{ strtolower($label) }}">
+                                                    <i data-lucide="copy"></i>
+                                                </button>
+                                            </dd>
                                         </div>
                                     @endforeach
                                 </dl>
                             @endif
+                        @endif
+                        @if ($doc && in_array($requirement->type->slug, ['cedula', 'cedula-papeleta', 'planilla-servicios'], true))
+                            <form class="extract-action" method="post" action="{{ route('accounts.requirements.extract', [$opening, $doc]) }}">
+                                @csrf
+                                <button class="doc-action" type="submit" aria-label="Extraer datos del documento" data-tooltip="Extraer nombres o dirección">
+                                    <i data-lucide="sparkles"></i>
+                                </button>
+                            </form>
                         @endif
                     </div>
                     <form method="post" enctype="multipart/form-data" action="{{ route('accounts.requirements.upload', $opening) }}">
@@ -406,12 +425,17 @@
                             <p class="hint">Se guardará como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>
                         @endif
                         @include('partials.badge', ['status' => $doc->status ?? 'pendiente'])
+                        @if ($template->requires_signature && $doc && !$doc->manual_signature_confirmed)
+                            <p class="hint"><strong>Firma pendiente:</strong> reemplace el archivo y confirme la revisión.</p>
+                        @endif
                     </div>
-                    <form method="post" enctype="multipart/form-data" action="{{ route('accounts.internal.upload', $opening) }}">
+                    <form method="post" enctype="multipart/form-data" action="{{ route('accounts.internal.upload', $opening) }}" @if($template->requires_signature) data-requires-signature="1" data-signature-label="{{ $template->name }}" @endif>
                         @csrf
                         <input type="hidden" name="internal_document_template_id" value="{{ $template->id }}">
                         <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required>
-                        <label class="check"><input type="checkbox" name="manual_signature_confirmed" value="1" required> Firma validada</label>
+                        @if ($template->requires_signature)
+                            <label class="check"><input type="checkbox" name="manual_signature_confirmed" value="1"> Firma validada</label>
+                        @endif
                         <select name="status">
                             <option value="cargado">Cargado</option>
                             <option value="validado">Validado</option>
@@ -485,12 +509,17 @@
                             @endif
                             <p class="hint">Se guardará como: {{ str_replace('{expediente}', $opening->file_name, $template->file_name_pattern) }}</p>
                             @include('partials.badge', ['status' => $doc->status ?? 'pendiente'])
+                            @if ($template->requires_signature && $doc && !$doc->manual_signature_confirmed)
+                                <p class="hint"><strong>Firma pendiente:</strong> reemplace el archivo y confirme la revisión.</p>
+                            @endif
                         </div>
-                        <form method="post" enctype="multipart/form-data" action="{{ route('accounts.services.documents.upload', $opening) }}">
+                        <form method="post" enctype="multipart/form-data" action="{{ route('accounts.services.documents.upload', $opening) }}" @if($template->requires_signature) data-requires-signature="1" data-signature-label="{{ $template->name }}" @endif>
                             @csrf
                             <input type="hidden" name="internal_document_template_id" value="{{ $template->id }}">
                             <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required>
-                            <label class="check"><input type="checkbox" name="manual_signature_confirmed" value="1" required> Firma validada</label>
+                            @if ($template->requires_signature)
+                                <label class="check"><input type="checkbox" name="manual_signature_confirmed" value="1"> Firma validada</label>
+                            @endif
                             <select name="status">
                                 <option value="cargado">Cargado</option>
                                 <option value="validado">Validado</option>

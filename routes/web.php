@@ -44,6 +44,7 @@ Route::prefix('aperturas')->name('accounts.')->group(function () {
     Route::post('/{opening}/requisitos-opcionales', [AccountOpeningController::class, 'updateOptionalRequirements'])->name('optional-requirements.update');
     Route::post('/{opening}/consentimiento', [AccountOpeningController::class, 'uploadConsent'])->name('consent.upload');
     Route::post('/{opening}/documentos', [AccountOpeningController::class, 'uploadRequirement'])->name('requirements.upload');
+    Route::post('/{opening}/documentos/{document}/extraer', [AccountOpeningController::class, 'extractRequirementData'])->name('requirements.extract');
     Route::post('/{opening}/consulta-externa', [AccountOpeningController::class, 'uploadExternalEvidence'])->name('external.upload');
     Route::post('/{opening}/nombre-expediente', [AccountOpeningController::class, 'confirmFileName'])->name('file-name.update');
     Route::get('/{opening}/documentos-internos/{template}/generar', [AccountOpeningController::class, 'generateInternalDocument'])->name('internal.generate');

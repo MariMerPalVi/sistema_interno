@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DataUpdateDocument;
 use App\Models\DataUpdateHistory;
 use App\Models\DataUpdateProcess;
+use App\Services\SignatureValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -131,10 +132,26 @@ class DataUpdateController extends Controller
             'document_key' => ['required', Rule::in($requiredDocuments->keys()->all())],
             'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:'.self::MAX_FILE_KB],
             'status' => ['required', Rule::in(['cargado', 'validado', 'rechazado'])],
+            'manual_signature_confirmed' => ['nullable'],
             'observations' => ['nullable', 'string', 'max:500'],
         ]);
 
         $document = $requiredDocuments->get($data['document_key']);
+
+        if ($document['requires_signature']) {
+            $request->validate([
+                'manual_signature_confirmed' => ['required', 'accepted'],
+            ], [
+                'manual_signature_confirmed.required' => "Revise la firma de {$document['name']} antes de cargarlo.",
+                'manual_signature_confirmed.accepted' => "Debe confirmar que {$document['name']} contiene firma.",
+            ]);
+
+            $signatureError = app(SignatureValidationService::class)->validationError($request->file('file'));
+            if ($signatureError) {
+                return back()->withErrors($signatureError);
+            }
+        }
+
         $path = $this->storeFile($request->file('file'), $update, $document['file_name']);
 
         DataUpdateDocument::updateOrCreate(
@@ -149,6 +166,7 @@ class DataUpdateController extends Controller
                 'mime_type' => $request->file('file')->getMimeType() ?: 'application/octet-stream',
                 'file_size' => $request->file('file')->getSize(),
                 'status' => $data['status'],
+                'manual_signature_confirmed' => !$document['requires_signature'] || $request->boolean('manual_signature_confirmed'),
                 'observations' => $data['observations'] ?? null,
                 'uploaded_by' => auth()->id(),
             ]
@@ -226,10 +244,12 @@ class DataUpdateController extends Controller
             'cedula-papeleta' => [
                 'name' => 'Cédula y papeleta de votación',
                 'file_name' => '1. Cedula y papeleta_{expediente}',
+                'requires_signature' => false,
             ],
             'formulario-actualizacion' => [
                 'name' => 'Formulario de actualización de datos firmado',
                 'file_name' => '2. Formulario actualizacion datos_{expediente}',
+                'requires_signature' => true,
             ],
         ];
 
@@ -239,6 +259,7 @@ class DataUpdateController extends Controller
             $documents['planilla-servicios'] = [
                 'name' => 'Planilla de servicios básicos',
                 'file_name' => '3. Planilla de SB_{expediente}',
+                'requires_signature' => false,
             ];
         }
 
@@ -246,6 +267,7 @@ class DataUpdateController extends Controller
             $documents['respaldo-estado-civil'] = [
                 'name' => 'Respaldo de estado civil o documentos del cónyuge',
                 'file_name' => '4. Respaldo estado civil_{expediente}',
+                'requires_signature' => false,
             ];
         }
 
@@ -253,6 +275,7 @@ class DataUpdateController extends Controller
             $documents['respaldo-actividad'] = [
                 'name' => 'Respaldo de actividad económica o ingresos',
                 'file_name' => '5. Respaldo actividad economica_{expediente}',
+                'requires_signature' => false,
             ];
         }
 
@@ -260,6 +283,7 @@ class DataUpdateController extends Controller
             $documents['residencia-fiscal'] = [
                 'name' => 'Formulario de autocertificación de residencia fiscal',
                 'file_name' => '6. Residencia fiscal_{expediente}',
+                'requires_signature' => true,
             ];
         }
 
@@ -275,9 +299,13 @@ class DataUpdateController extends Controller
         $update->loadMissing('documents');
         $loaded = $update->documents
             ->whereIn('status', ['cargado', 'validado'])
-            ->pluck('document_key');
+            ->keyBy('document_key');
 
-        return collect($this->requiredDocuments($update))->pluck('key')->diff($loaded)->isEmpty();
+        return collect($this->requiredDocuments($update))->every(function (array $required) use ($loaded) {
+            $document = $loaded->get($required['key']);
+
+            return $document && (!$required['requires_signature'] || $document->manual_signature_confirmed);
+        });
     }
 
     private function progress(DataUpdateProcess $update): int

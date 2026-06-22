@@ -17,6 +17,7 @@ use App\Models\SelectedAdditionalService;
 use App\Models\UploadedDocument;
 use App\Services\AutomatedReviewService;
 use App\Services\DocumentExtractionService;
+use App\Services\SignatureValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -192,7 +193,11 @@ class AccountOpeningController extends Controller
             'manual_signature_confirmed.accepted' => 'Debe confirmar manualmente que el consentimiento contiene firma.',
         ]);
 
-        $signatureError = $this->consentSignatureError($request->file('signed_file'));
+        $signatureValidator = app(SignatureValidationService::class);
+        $signatureError = $signatureValidator->validationError(
+            $request->file('signed_file'),
+            'formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf'
+        );
         if ($signatureError) {
             return redirect()
                 ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
@@ -200,7 +205,7 @@ class AccountOpeningController extends Controller
         }
 
         $path = $this->storeFile($request->file('signed_file'), $opening, 'consentimiento', 'Consentimiento para el Tratamiento de Datos Personales_{expediente}');
-        $autoSignal = $this->hasSignatureSignal($request->file('signed_file'));
+        $autoSignal = $signatureValidator->hasAutomaticSignal($request->file('signed_file'));
 
         $opening->consent()->updateOrCreate(
             ['account_opening_id' => $opening->id],
@@ -260,8 +265,7 @@ class AccountOpeningController extends Controller
         $extracted = app(DocumentExtractionService::class)->extract(
             $requirement->type->slug,
             $request->file('file'),
-            config('opening.ocr_on_upload', false)
-                && in_array($requirement->type->slug, ['cedula', 'cedula-papeleta'], true)
+            in_array($requirement->type->slug, ['cedula', 'cedula-papeleta', 'planilla-servicios'], true)
         );
         $this->syncMemberDataFromExtraction($opening, $requirement->type->slug, $extracted);
 
@@ -297,6 +301,54 @@ class AccountOpeningController extends Controller
         return redirect()
             ->route('accounts.show', [$opening, 'paso' => $nextStep])
             ->with('success', 'Requisito guardado.');
+    }
+
+    public function extractRequirementData(AccountOpening $opening, UploadedDocument $document)
+    {
+        abort_unless(
+            $document->account_opening_id === $opening->id
+                && $document->document_scope === 'requisito'
+                && $document->account_type_requirement_id,
+            404
+        );
+
+        $requirement = AccountTypeRequirement::with('type')
+            ->where('account_type_id', $opening->account_type_id)
+            ->findOrFail($document->account_type_requirement_id);
+        $slug = $requirement->type->slug;
+
+        abort_unless(in_array($slug, ['cedula', 'cedula-papeleta', 'planilla-servicios'], true), 404);
+
+        if (!Storage::exists($document->file_path)) {
+            return back()->withErrors('No se encontró el archivo almacenado para realizar la extracción.');
+        }
+
+        $file = new UploadedFile(
+            Storage::path($document->file_path),
+            $document->original_name ?: basename($document->file_path),
+            $document->mime_type,
+            null,
+            true
+        );
+        $extracted = app(DocumentExtractionService::class)->extract($slug, $file, true);
+
+        $document->update(['extracted_data' => $extracted]);
+        $this->syncMemberDataFromExtraction($opening, $slug, $extracted);
+        $this->audit($opening, 'extraer_datos_requisito', "Datos extraídos nuevamente de {$requirement->label}.");
+
+        $hasUsefulData = in_array($slug, ['cedula', 'cedula-papeleta'], true)
+            ? filled($extracted['nombres'] ?? null) || filled($extracted['apellidos'] ?? null)
+            : filled($extracted['direccion'] ?? null);
+
+        if (!$hasUsefulData) {
+            return redirect()
+                ->route('accounts.show', [$opening, 'paso' => 'requisitos'])
+                ->withErrors('No se pudieron reconocer los datos. Verifique que el documento sea legible y esté correctamente orientado.');
+        }
+
+        return redirect()
+            ->route('accounts.show', [$opening, 'paso' => 'requisitos'])
+            ->with('success', 'Datos extraídos. Puede copiarlos desde el requisito.');
     }
 
     public function uploadExternalEvidence(Request $request, AccountOpening $opening)
@@ -597,7 +649,7 @@ class AccountOpeningController extends Controller
         $data = $request->validate([
             'internal_document_template_id' => ['required', 'exists:internal_document_templates,id'],
             'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:'.self::MAX_FILE_KB],
-            'manual_signature_confirmed' => ['accepted'],
+            'manual_signature_confirmed' => ['nullable'],
             'status' => ['required', Rule::in(['cargado', 'validado', 'rechazado'])],
         ], [
             'manual_signature_confirmed.accepted' => 'Debe confirmar que el documento interno contiene firma cuando aplique.',
@@ -618,6 +670,27 @@ class AccountOpeningController extends Controller
         $template = $this->internalTemplatesForOpening($opening)
             ->where('id', $data['internal_document_template_id'])
             ->firstOrFail();
+
+        if ($template->requires_signature) {
+            $request->validate([
+                'manual_signature_confirmed' => ['required', 'accepted'],
+            ], [
+                'manual_signature_confirmed.required' => "Revise la firma de {$template->name} antes de cargarlo.",
+                'manual_signature_confirmed.accepted' => "Debe confirmar que {$template->name} contiene firma.",
+            ]);
+
+            $signatureError = app(SignatureValidationService::class)->validationError(
+                $request->file('file'),
+                $template->template_path
+            );
+
+            if ($signatureError) {
+                return redirect()
+                    ->route('accounts.show', [$opening, 'paso' => 'internos'])
+                    ->withErrors($signatureError);
+            }
+        }
+
         $path = $this->storeFile($request->file('file'), $opening, 'internos', $template->file_name_pattern);
 
         UploadedDocument::updateOrCreate(
@@ -633,7 +706,7 @@ class AccountOpeningController extends Controller
                 'mime_type' => $request->file('file')->getMimeType(),
                 'file_size' => $request->file('file')->getSize(),
                 'status' => $data['status'],
-                'manual_signature_confirmed' => true,
+                'manual_signature_confirmed' => !$template->requires_signature || $request->boolean('manual_signature_confirmed'),
                 'uploaded_by' => auth()->id(),
             ]
         );
@@ -787,7 +860,7 @@ class AccountOpeningController extends Controller
         $data = $request->validate([
             'internal_document_template_id' => ['required', 'exists:internal_document_templates,id'],
             'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:'.self::MAX_FILE_KB],
-            'manual_signature_confirmed' => ['accepted'],
+            'manual_signature_confirmed' => ['nullable'],
             'status' => ['required', Rule::in(['cargado', 'validado', 'rechazado'])],
         ], [
             'manual_signature_confirmed.accepted' => 'Debe confirmar que el documento del servicio contiene firma.',
@@ -804,6 +877,26 @@ class AccountOpeningController extends Controller
             ->where('id', $data['internal_document_template_id'])
             ->firstOrFail();
 
+        if ($template->requires_signature) {
+            $request->validate([
+                'manual_signature_confirmed' => ['required', 'accepted'],
+            ], [
+                'manual_signature_confirmed.required' => "Revise la firma de {$template->name} antes de cargarlo.",
+                'manual_signature_confirmed.accepted' => "Debe confirmar que {$template->name} contiene firma.",
+            ]);
+
+            $signatureError = app(SignatureValidationService::class)->validationError(
+                $request->file('file'),
+                $template->template_path
+            );
+
+            if ($signatureError) {
+                return redirect()
+                    ->route('accounts.show', [$opening, 'paso' => 'servicios'])
+                    ->withErrors($signatureError);
+            }
+        }
+
         $path = $this->storeFile($request->file('file'), $opening, 'servicios', $template->file_name_pattern);
 
         UploadedDocument::updateOrCreate(
@@ -819,7 +912,7 @@ class AccountOpeningController extends Controller
                 'mime_type' => $request->file('file')->getMimeType(),
                 'file_size' => $request->file('file')->getSize(),
                 'status' => $data['status'],
-                'manual_signature_confirmed' => true,
+                'manual_signature_confirmed' => !$template->requires_signature || $request->boolean('manual_signature_confirmed'),
                 'uploaded_by' => auth()->id(),
             ]
         );
@@ -1404,27 +1497,6 @@ class AccountOpeningController extends Controller
         return $code;
     }
 
-    private function hasSignatureSignal(UploadedFile $file): bool
-    {
-        $name = strtolower($file->getClientOriginalName());
-        return str_contains($name, 'firm') || str_contains($name, 'signed') || str_contains($name, 'firma');
-    }
-
-    private function consentSignatureError(UploadedFile $file): ?string
-    {
-        $blankTemplate = public_path('formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf');
-        if (is_file($blankTemplate) && hash_file('sha256', $blankTemplate) === hash_file('sha256', $file->getRealPath())) {
-            return 'El archivo cargado parece ser el formato original sin firma. Imprima el consentimiento, obtenga la firma del socio y cargue el documento firmado.';
-        }
-
-        $name = strtolower($file->getClientOriginalName());
-        if (str_contains($name, 'sin_firma') || str_contains($name, 'sin-firma') || str_contains($name, 'no_firmado')) {
-            return 'El nombre del archivo indica que el consentimiento no está firmado. Cargue el documento firmado para continuar.';
-        }
-
-        return null;
-    }
-
     private function simulateExtraction(string $slug, AccountOpening $opening, UploadedFile $file): array
     {
         $base = ['archivo' => $file->getClientOriginalName(), 'revision' => 'Pendiente de OCR certificado'];
@@ -1578,13 +1650,18 @@ class AccountOpeningController extends Controller
 
     private function internalDocumentsAreComplete(AccountOpening $opening): bool
     {
-        $requiredIds = $this->internalTemplatesForOpening($opening)->where('is_required', true)->pluck('id');
-        $loadedIds = $opening->documents()
+        $requiredTemplates = $this->internalTemplatesForOpening($opening)->where('is_required', true)->get();
+        $loadedDocuments = $opening->documents()
             ->where('document_scope', 'interno')
             ->whereIn('status', ['cargado', 'validado'])
-            ->pluck('internal_document_template_id');
+            ->get()
+            ->keyBy('internal_document_template_id');
 
-        return $requiredIds->diff($loadedIds)->isEmpty();
+        return $requiredTemplates->every(function (InternalDocumentTemplate $template) use ($loadedDocuments) {
+            $document = $loadedDocuments->get($template->id);
+
+            return $document && (!$template->requires_signature || $document->manual_signature_confirmed);
+        });
     }
 
     private function internalTemplatesForOpening(AccountOpening $opening)
@@ -1801,13 +1878,18 @@ class AccountOpeningController extends Controller
             return true;
         }
 
-        $requiredIds = $this->serviceDocumentTemplates()->whereIn('slug', $templateSlugs)->pluck('id');
-        $loadedIds = $opening->documents()
+        $requiredTemplates = $this->serviceDocumentTemplates()->whereIn('slug', $templateSlugs)->get();
+        $loadedDocuments = $opening->documents()
             ->where('document_scope', 'servicio')
             ->whereIn('status', ['cargado', 'validado'])
-            ->pluck('internal_document_template_id');
+            ->get()
+            ->keyBy('internal_document_template_id');
 
-        return $requiredIds->diff($loadedIds)->isEmpty();
+        return $requiredTemplates->every(function (InternalDocumentTemplate $template) use ($loadedDocuments) {
+            $document = $loadedDocuments->get($template->id);
+
+            return $document && (!$template->requires_signature || $document->manual_signature_confirmed);
+        });
     }
 
     private function workflowState(AccountOpening $opening): array

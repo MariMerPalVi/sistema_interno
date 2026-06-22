@@ -226,6 +226,14 @@ class AutomatedReviewService
             $findings = array_merge($findings, $this->reviewDocumentFile($document->display_name, $document));
         }
 
+        $templates = InternalDocumentTemplate::whereIn('id', $documents->keys())->get()->keyBy('id');
+        foreach ($documents as $templateId => $document) {
+            $template = $templates->get($templateId);
+            if ($template?->requires_signature && !$document->manual_signature_confirmed) {
+                $findings[] = $this->finding('error', $template->name, 'Documento de servicio sin confirmación de firma.');
+            }
+        }
+
         return $findings;
     }
 
