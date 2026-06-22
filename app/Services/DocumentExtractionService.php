@@ -64,6 +64,10 @@ class DocumentExtractionService
             if (mb_strlen($ocrText) > 30) {
                 // La capa de texto de algunos PDF escaneados conserva datos de un
                 // documento anterior. El OCR representa lo que el asesor ve.
+                if ($forceOcr) {
+                    return trim($ocrText);
+                }
+
                 $text = trim($ocrText."\n".$text);
             }
         }
@@ -249,46 +253,83 @@ class DocumentExtractionService
     private function extractPersonName(string $text): ?string
     {
         $patterns = [
-            '/(?:APELLIDOS\s+NOMBRES|NOMBRES\s+APELLIDOS)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+LUGAR DE NACIMIENTO\b)/si',
-            '/(?:APELLIDOS Y NOMBRES|NOMBRES Y APELLIDOS)\s*[:\-]?\s*.{0,6}?([A-ZÁÉÍÓÚÑ0-9\'\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si',
+            ['/\b(?:APELLIDOS\s+(?:Y\s+)?NOMBRES|NOMBRES\s+(?:Y\s+)?APELLIDOS)\s*[:\-]?\s*.{0,6}?([A-ZÁÉÍÓÚÑ0-9\'\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si', 12],
             // Varias papeletas ubican el número y el nombre completo al final.
-            '/\b\d{10}\b\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s*(?:---PAGE---)?\s*$/si',
+            ['/\b\d{10}\b\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s*(?:---PAGE---)?\s*$/si', 10],
             // En los archivos combinados, la papeleta suele conservar mejor el nombre completo.
-            '/CERTIFICADO\s+DE\s+VOTACI[ÓO]N\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVINCIA\b/si',
-            '/CERTIFICADO DE VOTACI[ÓO]N.*?\b\d{4}\b\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVINCIA\b/si',
-            '/(?:REFER[ÉE]NDUM|CONSULTA POPULAR|ELECCIONES).*?\b\d{4}\b\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVINCIA\b/si',
-            '/(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ0-9\'\s]{8,100}?)(?=\s+APELLIDOS Y NOMBRES DEL PADRE\b)/si',
-            '/NOMBRE DEL TITULAR\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:C[ÉE]DULA|CORREO|TEL[ÉE]FONO|FIRMA|FECHA)\b)/si',
-            '/YO[,\s]+([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s*,?\s*PORTADOR(?:A)?\b)/si',
-            '/CERTIFICADO DE VOTACI[ÓO]N.*?(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVIN[A-ZÁÉÍÓÚÑ]{0,6}\b/si',
-            '/(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVIN[A-ZÁÉÍÓÚÑ]{0,6}\b/si',
-            '/(?:CIUDADANO|CIUDADANA)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si',
+            ['/CERTIFICADO.{0,30}VOTACI.{0,3}N\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVINCIA\b/si', 12],
+            ['/CERTIFICADO\s+DE\s+VOTACI[ÓO]N\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVINCIA\b/si', 11],
+            ['/CERTIFICADO DE VOTACI[ÓO]N.*?\b\d{4}\b\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVINCIA\b/si', 10],
+            ['/(?:REFER[ÉE]NDUM|CONSULTA POPULAR|ELECCIONES).*?\b\d{4}\b\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVINCIA\b/si', 9],
+            ['/(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ0-9\'\s]{8,100}?)(?=\s+APELLIDOS Y NOMBRES DEL PADRE\b)/si', 8],
+            ['/NOMBRE DEL TITULAR\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:C[ÉE]DULA|CORREO|TEL[ÉE]FONO|FIRMA|FECHA)\b)/si', 12],
+            ['/YO[,\s]+([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s*,?\s*PORTADOR(?:A)?\b)/si', 9],
+            ['/(?:CIUDADANO|CIUDADANA)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si', 7],
         ];
 
-        foreach ($patterns as $pattern) {
-            if (!preg_match($pattern, $text, $matches)) {
+        $candidates = [];
+        foreach ($patterns as [$pattern, $weight]) {
+            if (!preg_match_all($pattern, $text, $matches, PREG_SET_ORDER)) {
                 continue;
             }
 
-            $candidate = $this->cleanPersonName($matches[1] ?? null);
-            if ($candidate) {
-                return $candidate;
+            foreach ($matches as $match) {
+                $this->addNameCandidate($candidates, $match[1] ?? null, $weight);
             }
         }
 
-        return null;
+        $lines = array_values(array_filter(array_map('trim', preg_split('/\n+/u', $text) ?: [])));
+        foreach ($lines as $index => $line) {
+            $withoutLabel = preg_replace('/^.*?\b(?:APELLIDOS\s+(?:Y\s+)?NOMBRES|NOMBRES\s+(?:Y\s+)?APELLIDOS)\b\s*[:\-]?/u', '', $line);
+            if ($withoutLabel !== $line) {
+                $withoutLabel = preg_split('/\b(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVINCIA|C[ÉE]DULA)\b/u', $withoutLabel, 2)[0] ?? $withoutLabel;
+                $this->addNameCandidate($candidates, $withoutLabel, 13);
+            }
+
+            if ($index > 0 && preg_match('/\b(?:APELLIDOS\s+(?:Y\s+)?NOMBRES|NOMBRES\s+(?:Y\s+)?APELLIDOS)\b/u', $lines[$index - 1])) {
+                $this->addNameCandidate($candidates, $line, 12);
+            }
+
+            if ($index + 1 < count($lines) && preg_match('/\bPROVINCIA\b/u', $lines[$index + 1])) {
+                $this->addNameCandidate($candidates, $line, 7);
+            }
+
+            if ($index > 0 && preg_match('/\b\d{10}\b/u', $lines[$index - 1])) {
+                $this->addNameCandidate($candidates, $line, 6);
+            }
+        }
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        arsort($candidates);
+
+        return array_key_first($candidates);
+    }
+
+    private function addNameCandidate(array &$candidates, ?string $value, int $weight): void
+    {
+        $candidate = $this->cleanPersonName($value);
+        if (!$candidate) {
+            return;
+        }
+
+        $tokens = array_values(array_filter(explode(' ', $candidate)));
+        $tokenScore = match (count($tokens)) {
+            4 => 6,
+            3 => 4,
+            2, 5 => 2,
+            default => 0,
+        };
+
+        $candidates[$candidate] = max($candidates[$candidate] ?? 0, $weight + $tokenScore);
     }
 
     private function extractPersonNameParts(string $text): array
     {
-        $fullName = $this->extractPersonName($text);
-        if ($fullName) {
-            [$lastNames, $firstNames] = $this->splitEcuadorianName($fullName);
-
-            return [$fullName, $lastNames, $firstNames];
-        }
-
         // Algunas cédulas nuevas imprimen APELLIDOS y NOMBRES como campos separados.
+        $separatedFields = null;
         $patterns = [
             '/\bAPELLIDOS\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{2,70}?)\s+NOMBRES\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{2,70}?)(?=\s+NACIONALIDAD\b)/si',
             '/\bAPELLIDO(?:S)?\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{2,70}?)\s+NOMBRE(?:S)?\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{2,70}?)(?=\s+(?:NACIONALIDAD|SEXO|FECHA)\b)/si',
@@ -304,11 +345,28 @@ class DocumentExtractionService
             $candidate = trim($lastNames.' '.$firstNames);
 
             if ($lastNames && $firstNames && $this->isPlausiblePersonName($candidate)) {
-                return [$candidate, $lastNames, $firstNames];
+                $separatedFields = [$candidate, $lastNames, $firstNames];
+                break;
             }
         }
 
-        return [null, null, null];
+        $fullName = $this->extractPersonName($text);
+        if ($fullName) {
+            if ($separatedFields && $this->nameTokenCount($separatedFields[0]) >= $this->nameTokenCount($fullName)) {
+                return $separatedFields;
+            }
+
+            [$lastNames, $firstNames] = $this->splitEcuadorianName($fullName);
+
+            return [$fullName, $lastNames, $firstNames];
+        }
+
+        return $separatedFields ?? [null, null, null];
+    }
+
+    private function nameTokenCount(string $name): int
+    {
+        return count(array_filter(explode(' ', trim($name))));
     }
 
     private function cleanNamePart(?string $value): ?string

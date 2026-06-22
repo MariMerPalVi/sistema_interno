@@ -67,7 +67,15 @@ function Get-OcrTextFromStream($stream, $engine) {
     }
 
     $result = AwaitOperation ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
-    return $result.Text
+    $lines = New-Object System.Collections.Generic.List[string]
+    foreach ($line in $result.Lines) {
+        $words = @($line.Words | ForEach-Object { $_.Text })
+        if ($words.Count -gt 0) {
+            $lines.Add(($words -join " "))
+        }
+    }
+
+    return ($lines -join "`n")
 }
 
 $resolvedPath = [System.IO.Path]::GetFullPath($Path)
