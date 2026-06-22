@@ -24,7 +24,9 @@
     $yearSuffix = substr((string) $year, -1);
     $requestType = $fields['tipo_solicitante'] ?? 'socio';
     $mortuaryFund = $fields['fondo_mortuorio'] ?? 'no';
-    $nominalValue = $fields['valor_nominal'] ?? '';
+    $nominalValue = filled($fields['valor_nominal'] ?? null)
+        ? $fields['valor_nominal']
+        : '35.00 (Treinta y cinco dólares americanos)';
 @endphp
 <!doctype html>
 <html lang="es">
@@ -896,7 +898,7 @@
         .contribution-certificate {
             position: relative;
             min-height: 297mm;
-            padding: 43mm 14mm 25mm;
+            padding: 35mm 14mm 25mm;
             color: #17202a;
         }
 
@@ -923,7 +925,7 @@
         }
 
         .certificate-office {
-            margin: 10mm 0 21mm;
+            margin: 10mm 0 11mm;
             text-align: center;
         }
 
@@ -944,7 +946,7 @@
         }
 
         .certificate-copy {
-            margin: 0 auto 18mm;
+            margin: 0 auto 10mm;
             max-width: 166mm;
             font-size: 16.5px;
             line-height: 1.2;
@@ -966,7 +968,7 @@
             display: block;
             width: 110mm;
             min-height: 6mm;
-            margin: 17mm auto 0;
+            margin: 12mm auto 0;
             border-bottom: 1px solid #17202a;
             font-weight: 600;
         }
@@ -988,16 +990,22 @@
 
         .certificate-account-fields {
             display: grid;
-            grid-template-columns: 60mm 1fr;
+            grid-template-columns: 64mm 1fr;
             gap: 2mm 3mm;
-            width: 160mm;
-            margin: 8mm auto 0;
+            width: 180mm;
+            margin: 10mm auto 0;
             font-size: 17px;
+        }
+
+        .certificate-account-fields .certificate-field {
+            font-size: 15px;
+            white-space: nowrap;
         }
 
         .certificate-account-fields strong {
             align-self: end;
             text-align: right;
+            white-space: nowrap;
         }
 
         .certificate-field {
@@ -1010,8 +1018,10 @@
         }
 
         .certificate-date {
-            margin: 4mm 0 0;
-            text-align: center;
+            width: 160mm;
+            margin: 6mm auto 0;
+            padding-right: 9mm;
+            text-align: right;
             font-size: 15px;
         }
 
@@ -1024,7 +1034,7 @@
         .certificate-signatures {
             position: absolute;
             right: 20mm;
-            bottom: 39mm;
+            bottom: 33mm;
             left: 20mm;
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -1035,8 +1045,27 @@
         }
 
         .certificate-signatures div {
-            padding-top: 2mm;
-            border-top: 1px solid #17202a;
+            padding-top: 0;
+            border-top: 0;
+        }
+
+        .certificate-signature-image {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            height: 19mm;
+            margin-bottom: 2mm;
+            border-bottom: 1px solid #17202a;
+            overflow: hidden;
+        }
+
+        .certificate-signature-image img {
+            display: block;
+            width: 59mm;
+            height: 18mm;
+            object-fit: fill;
+            mix-blend-mode: multiply;
+            filter: contrast(1.08);
         }
 
         .certificate-signatures strong,
@@ -1558,10 +1587,16 @@
 
                 <div class="certificate-signatures">
                     <div>
+                        <span class="certificate-signature-image">
+                            <img src="{{ route('protected-assets.certificate-signature', 'presidente') }}" alt="Firma de la Presidenta">
+                        </span>
                         <strong>LCDA. NANCY ALEGRÍA SUAREZ</strong>
                         <span>PRESIDENTE</span>
                     </div>
                     <div>
+                        <span class="certificate-signature-image">
+                            <img src="{{ route('protected-assets.certificate-signature', 'gerente') }}" alt="Firma del Gerente">
+                        </span>
                         <strong>ING. HITER MERA SANTANA</strong>
                         <span>GERENTE</span>
                     </div>

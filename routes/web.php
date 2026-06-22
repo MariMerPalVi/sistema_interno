@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountOpeningController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DataUpdateController;
 use App\Http\Controllers\ProcessController;
+use App\Http\Controllers\ProtectedAssetController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -16,6 +17,9 @@ Route::post('/salir', [AuthController::class, 'destroy'])->name('logout');
 Route::get('/mi-contrasena', [AuthController::class, 'editPassword'])->name('password.edit');
 Route::put('/mi-contrasena', [AuthController::class, 'updatePassword'])->name('password.update');
 Route::get('/', [ProcessController::class, 'index'])->name('processes.index');
+Route::get('/recursos/firmas-certificado/{authority}', [ProtectedAssetController::class, 'certificateSignature'])
+    ->whereIn('authority', ['presidente', 'gerente'])
+    ->name('protected-assets.certificate-signature');
 
 Route::prefix('actualizacion-datos')->name('data-updates.')->group(function () {
     Route::get('/', [DataUpdateController::class, 'index'])->name('index');

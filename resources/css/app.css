@@ -1687,10 +1687,30 @@ pre {
 }
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 5mm;
+  }
+
+  html,
+  body {
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .shell {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
   .topbar,
   .stepper,
   .progress,
   .summary-grid,
+  .alert,
   .checklist-storage,
   .checklist-actions,
   #resumen > form,
@@ -1711,7 +1731,59 @@ pre {
 
   .official-checklist {
     min-width: 0;
+    font-size: 9px;
+    line-height: 1.12;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .official-checklist tr,
+  .official-checklist td {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .official-checklist td {
+    height: 20px;
+    padding: 2px 4px;
+  }
+
+  .official-checklist .official-head td {
+    height: 44px;
     font-size: 10px;
+  }
+
+  .official-checklist .official-head span {
+    margin-top: 3px;
+  }
+
+  .official-checklist .official-logo img {
+    width: 120px;
+    max-height: 36px;
+  }
+
+  .official-checklist .section-row td,
+  .official-checklist tr.section-row td {
+    height: 23px;
+  }
+
+  .official-checklist .section-row td:not(:first-child) {
+    font-size: 8px;
+  }
+
+  .checklist-file-name {
+    margin-top: 1px;
+    font-size: 8px;
+    line-height: 1.05;
+  }
+
+  .official-checklist .path-row td {
+    padding: 3px 4px;
+    font-size: 8px;
+  }
+
+  .official-checklist .signature-row td {
+    height: 48px;
   }
 }
 

@@ -62,7 +62,9 @@ class DocumentExtractionService
         if ($forceOcr || config('opening.ocr_enabled', false)) {
             $ocrText = $this->extractTextWithWindowsOcr($file);
             if (mb_strlen($ocrText) > 30) {
-                $text = trim($text."\n".$ocrText);
+                // La capa de texto de algunos PDF escaneados conserva datos de un
+                // documento anterior. El OCR representa lo que el asesor ve.
+                $text = trim($ocrText."\n".$text);
             }
         }
 
@@ -133,8 +135,7 @@ class DocumentExtractionService
     private function extractId(string $text): array
     {
         $ids = $this->validEcuadorianIds($text);
-        $fullName = $this->extractPersonName($text);
-        [$lastNames, $firstNames] = $this->splitEcuadorianName($fullName);
+        [$fullName, $lastNames, $firstNames] = $this->extractPersonNameParts($text);
 
         return [
             'cedula' => $ids[0] ?? null,
@@ -143,8 +144,8 @@ class DocumentExtractionService
             'nombres' => $firstNames,
             'apellidos' => $lastNames,
             'nacionalidad' => $this->matchFirst($text, [
-                '/NACIONALIDAD\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ ]{4,40})/',
                 '/\b(ECUATORIANA|ECUATORIANO|COLOMBIANA|COLOMBIANO|VENEZOLANA|VENEZOLANO)\b/',
+                '/NACIONALIDAD\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ]{4,20})\b/',
             ]),
             'alerta_cedula' => isset($ids[0]) ? null : 'No se detectó un número de cédula ecuatoriana válido en el texto extraído.',
         ];
@@ -233,7 +234,11 @@ class DocumentExtractionService
 
         $name = preg_replace('/\b(PRIMERA|SEGUNDA|VUELTA|ELECCIONES|GENERALES|CERTIFICADO|VOTACION|VOTACIÓN)\b/u', ' ', $name) ?? $name;
         $name = str_replace(['ESCPBAR', 'BOSOUEZ', 'BOSQUEZ'], ['ESCOBAR', 'BOSQUEZ', 'BOSQUEZ'], $name);
+        $name = preg_replace('/\b4(?=[A-ZÁÉÍÓÚÑ])/u', 'A', $name) ?? $name;
+        $name = preg_replace('/\b0(?=[A-ZÁÉÍÓÚÑ])/u', 'O', $name) ?? $name;
         $name = preg_replace('/[^A-ZÁÉÍÓÚÑ ]/u', ' ', $name) ?? $name;
+        $name = preg_replace('/\s+/', ' ', $name) ?? $name;
+        $name = preg_replace('/(?:^|\s)[A-ZÁÉÍÓÚÑ](?=\s|$)/u', ' ', $name) ?? $name;
         $name = preg_replace('/\s+/', ' ', $name) ?? $name;
 
         $name = trim($name);
@@ -244,11 +249,19 @@ class DocumentExtractionService
     private function extractPersonName(string $text): ?string
     {
         $patterns = [
+            '/(?:APELLIDOS\s+NOMBRES|NOMBRES\s+APELLIDOS)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+LUGAR DE NACIMIENTO\b)/si',
+            '/(?:APELLIDOS Y NOMBRES|NOMBRES Y APELLIDOS)\s*[:\-]?\s*.{0,6}?([A-ZÁÉÍÓÚÑ0-9\'\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si',
+            // Varias papeletas ubican el número y el nombre completo al final.
+            '/\b\d{10}\b\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s*(?:---PAGE---)?\s*$/si',
+            // En los archivos combinados, la papeleta suele conservar mejor el nombre completo.
+            '/CERTIFICADO\s+DE\s+VOTACI[ÓO]N\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVINCIA\b/si',
+            '/CERTIFICADO DE VOTACI[ÓO]N.*?\b\d{4}\b\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVINCIA\b/si',
+            '/(?:REFER[ÉE]NDUM|CONSULTA POPULAR|ELECCIONES).*?\b\d{4}\b\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVINCIA\b/si',
+            '/(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ0-9\'\s]{8,100}?)(?=\s+APELLIDOS Y NOMBRES DEL PADRE\b)/si',
             '/NOMBRE DEL TITULAR\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:C[ÉE]DULA|CORREO|TEL[ÉE]FONO|FIRMA|FECHA)\b)/si',
             '/YO[,\s]+([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s*,?\s*PORTADOR(?:A)?\b)/si',
             '/CERTIFICADO DE VOTACI[ÓO]N.*?(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVIN[A-ZÁÉÍÓÚÑ]{0,6}\b/si',
             '/(?:PRIMERA|SEGUNDA)\s+VUELTA\s+([A-ZÁÉÍÓÚÑ\s]{8,100}?)\s+PROVIN[A-ZÁÉÍÓÚÑ]{0,6}\b/si',
-            '/(?:APELLIDOS Y NOMBRES|NOMBRES Y APELLIDOS)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si',
             '/(?:CIUDADANO|CIUDADANA)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{8,100}?)(?=\s+(?:NACIONALIDAD|SEXO|LUGAR|FECHA|PROVIN|C[ÉE]DULA)\b)/si',
         ];
 
@@ -264,6 +277,50 @@ class DocumentExtractionService
         }
 
         return null;
+    }
+
+    private function extractPersonNameParts(string $text): array
+    {
+        $fullName = $this->extractPersonName($text);
+        if ($fullName) {
+            [$lastNames, $firstNames] = $this->splitEcuadorianName($fullName);
+
+            return [$fullName, $lastNames, $firstNames];
+        }
+
+        // Algunas cédulas nuevas imprimen APELLIDOS y NOMBRES como campos separados.
+        $patterns = [
+            '/\bAPELLIDOS\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{2,70}?)\s+NOMBRES\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{2,70}?)(?=\s+NACIONALIDAD\b)/si',
+            '/\bAPELLIDO(?:S)?\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{2,70}?)\s+NOMBRE(?:S)?\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]{2,70}?)(?=\s+(?:NACIONALIDAD|SEXO|FECHA)\b)/si',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (!preg_match($pattern, $text, $matches)) {
+                continue;
+            }
+
+            $lastNames = $this->cleanNamePart($matches[1] ?? null);
+            $firstNames = $this->cleanNamePart($matches[2] ?? null);
+            $candidate = trim($lastNames.' '.$firstNames);
+
+            if ($lastNames && $firstNames && $this->isPlausiblePersonName($candidate)) {
+                return [$candidate, $lastNames, $firstNames];
+            }
+        }
+
+        return [null, null, null];
+    }
+
+    private function cleanNamePart(?string $value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        $value = preg_replace('/[^A-ZÁÉÍÓÚÑ ]/u', ' ', $value) ?? $value;
+        $value = trim(preg_replace('/\s+/', ' ', $value) ?? $value);
+
+        return $value !== '' ? $value : null;
     }
 
     private function isPlausiblePersonName(string $name): bool
@@ -302,7 +359,7 @@ class DocumentExtractionService
             return [null, $fullName];
         }
 
-        $lastNameCount = count($parts) >= 3 ? 2 : 1;
+        $lastNameCount = count($parts) >= 4 ? 2 : 1;
 
         return [
             implode(' ', array_slice($parts, 0, $lastNameCount)),
