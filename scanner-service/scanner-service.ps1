@@ -34,8 +34,10 @@ function New-HttpResponse {
         "Content-Type: $ContentType",
         "Content-Length: $($bytes.Length)",
         "Access-Control-Allow-Origin: *",
-        "Access-Control-Allow-Methods: POST, OPTIONS",
+        "Access-Control-Allow-Methods: GET, POST, OPTIONS",
         "Access-Control-Allow-Headers: Content-Type, Accept",
+        "Access-Control-Allow-Private-Network: true",
+        "Access-Control-Max-Age: 86400",
         "Connection: close",
         "",
         ""
@@ -49,12 +51,52 @@ function New-HttpResponse {
     return $response
 }
 
+function New-BinaryHttpResponse {
+    param(
+        [int] $StatusCode = 200,
+        [string] $ContentType = "image/jpeg",
+        [byte[]] $Bytes = @()
+    )
+
+    $reason = switch ($StatusCode) {
+        200 { "OK" }
+        404 { "Not Found" }
+        500 { "Internal Server Error" }
+        default { "OK" }
+    }
+
+    $headers = @(
+        "HTTP/1.1 $StatusCode $reason",
+        "Content-Type: $ContentType",
+        "Content-Length: $($Bytes.Length)",
+        "Cache-Control: no-store, no-cache, must-revalidate",
+        "Pragma: no-cache",
+        "Access-Control-Allow-Origin: *",
+        "Access-Control-Allow-Methods: GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers: Content-Type, Accept",
+        "Access-Control-Allow-Private-Network: true",
+        "Access-Control-Max-Age: 86400",
+        "Connection: close",
+        "",
+        ""
+    ) -join "`r`n"
+
+    $headerBytes = [System.Text.Encoding]::ASCII.GetBytes($headers)
+    $response = New-Object byte[] ($headerBytes.Length + $Bytes.Length)
+    [System.Array]::Copy($headerBytes, 0, $response, 0, $headerBytes.Length)
+    [System.Array]::Copy($Bytes, 0, $response, $headerBytes.Length, $Bytes.Length)
+
+    return $response
+}
+
 function New-OptionsResponse {
     $headers = @(
         "HTTP/1.1 204 No Content",
         "Access-Control-Allow-Origin: *",
-        "Access-Control-Allow-Methods: POST, OPTIONS",
+        "Access-Control-Allow-Methods: GET, POST, OPTIONS",
         "Access-Control-Allow-Headers: Content-Type, Accept",
+        "Access-Control-Allow-Private-Network: true",
+        "Access-Control-Max-Age: 86400",
         "Connection: close",
         "",
         ""
@@ -68,13 +110,205 @@ function ConvertTo-JsonText {
     return ($Data | ConvertTo-Json -Depth 6 -Compress)
 }
 
+function Get-DiagnosticFolder {
+    return (Join-Path $PSScriptRoot "ultimos-escaneos")
+}
+
+function Get-LastScanPath {
+    $diagnosticFolder = Get-DiagnosticFolder
+
+    if (!(Test-Path -LiteralPath $diagnosticFolder)) {
+        return $null
+    }
+
+    $file = Get-ChildItem -LiteralPath $diagnosticFolder -Filter "*.jpg" -File |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    if ($null -eq $file) {
+        return $null
+    }
+
+    return $file.FullName
+}
+
+function New-LastScanResponse {
+    $lastScanPath = Get-LastScanPath
+
+    if (!$lastScanPath -or !(Test-Path -LiteralPath $lastScanPath)) {
+        return New-HttpResponse -StatusCode 404 -Body (ConvertTo-JsonText @{
+            ok = $false
+            message = "Todavia no hay una imagen escaneada para previsualizar."
+        })
+    }
+
+    $bytes = [System.IO.File]::ReadAllBytes($lastScanPath)
+    return New-BinaryHttpResponse -StatusCode 200 -ContentType "image/jpeg" -Bytes $bytes
+}
+
+function Get-Brightness {
+    param([System.Drawing.Color] $Color)
+    return (($Color.R * 0.299) + ($Color.G * 0.587) + ($Color.B * 0.114))
+}
+
+function Get-ColorDistance {
+    param(
+        [System.Drawing.Color] $A,
+        [System.Drawing.Color] $B
+    )
+
+    $dr = $A.R - $B.R
+    $dg = $A.G - $B.G
+    $db = $A.B - $B.B
+
+    return [Math]::Sqrt(($dr * $dr) + ($dg * $dg) + ($db * $db))
+}
+
+function Get-AutoCropRectangle {
+    param(
+        [System.Drawing.Bitmap] $Bitmap,
+        [int] $Padding = 28
+    )
+
+    $width = $Bitmap.Width
+    $height = $Bitmap.Height
+    $cornerSamples = @(
+        $Bitmap.GetPixel(4, 4),
+        $Bitmap.GetPixel([Math]::Max(0, $width - 5), 4),
+        $Bitmap.GetPixel(4, [Math]::Max(0, $height - 5)),
+        $Bitmap.GetPixel([Math]::Max(0, $width - 5), [Math]::Max(0, $height - 5))
+    )
+
+    $avgR = [int](($cornerSamples | Measure-Object -Property R -Average).Average)
+    $avgG = [int](($cornerSamples | Measure-Object -Property G -Average).Average)
+    $avgB = [int](($cornerSamples | Measure-Object -Property B -Average).Average)
+    $background = [System.Drawing.Color]::FromArgb($avgR, $avgG, $avgB)
+
+    $minX = $width
+    $minY = $height
+    $maxX = 0
+    $maxY = 0
+    $step = [Math]::Max(2, [int][Math]::Floor([Math]::Max($width, $height) / 900))
+
+    for ($y = 0; $y -lt $height; $y += $step) {
+        for ($x = 0; $x -lt $width; $x += $step) {
+            $pixel = $Bitmap.GetPixel($x, $y)
+            $brightness = Get-Brightness $pixel
+            $distance = Get-ColorDistance $pixel $background
+            $saturation = $pixel.GetSaturation()
+
+            $isUsefulPixel = ($distance -gt 22 -and $brightness -lt 248) -or
+                ($brightness -lt 232) -or
+                ($saturation -gt 0.12 -and $distance -gt 14)
+
+            if ($isUsefulPixel) {
+                if ($x -lt $minX) { $minX = $x }
+                if ($y -lt $minY) { $minY = $y }
+                if ($x -gt $maxX) { $maxX = $x }
+                if ($y -gt $maxY) { $maxY = $y }
+            }
+        }
+    }
+
+    if ($minX -ge $maxX -or $minY -ge $maxY) {
+        return [System.Drawing.Rectangle]::new(0, 0, $width, $height)
+    }
+
+    $minX = [Math]::Max(0, $minX - $Padding)
+    $minY = [Math]::Max(0, $minY - $Padding)
+    $maxX = [Math]::Min($width - 1, $maxX + $Padding)
+    $maxY = [Math]::Min($height - 1, $maxY + $Padding)
+
+    $cropWidth = [Math]::Max(1, $maxX - $minX + 1)
+    $cropHeight = [Math]::Max(1, $maxY - $minY + 1)
+    $cropArea = $cropWidth * $cropHeight
+    $sourceArea = $width * $height
+
+    if ($cropArea -lt ($sourceArea * 0.03) -or $cropWidth -lt 260 -or $cropHeight -lt 120) {
+        return [System.Drawing.Rectangle]::new(0, 0, $width, $height)
+    }
+
+    return [System.Drawing.Rectangle]::new($minX, $minY, $cropWidth, $cropHeight)
+}
+
+function Save-OptimizedJpeg {
+    param(
+        [string] $SourcePath,
+        [string] $TargetPath,
+        [int] $MaxSide = 1500,
+        [int] $Quality = 76,
+        [bool] $AutoCrop = $false
+    )
+
+    Add-Type -AssemblyName System.Drawing
+
+    $source = [System.Drawing.Bitmap]::FromFile($SourcePath)
+
+    try {
+        $crop = [System.Drawing.Rectangle]::new(0, 0, $source.Width, $source.Height)
+
+        if ($AutoCrop) {
+            $crop = Get-AutoCropRectangle -Bitmap $source
+            Write-Log "Recorte automatico: x=$($crop.X), y=$($crop.Y), w=$($crop.Width), h=$($crop.Height)"
+        }
+
+        $scale = [Math]::Min(1, $MaxSide / [Math]::Max($crop.Width, $crop.Height))
+        $width = [Math]::Max(1, [int][Math]::Round($crop.Width * $scale))
+        $height = [Math]::Max(1, [int][Math]::Round($crop.Height * $scale))
+
+        $bitmap = New-Object System.Drawing.Bitmap($width, $height)
+
+        try {
+            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+
+            try {
+                $graphics.Clear([System.Drawing.Color]::White)
+                $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+                $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+                $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+                $graphics.DrawImage(
+                    $source,
+                    [System.Drawing.Rectangle]::new(0, 0, $width, $height),
+                    $crop,
+                    [System.Drawing.GraphicsUnit]::Pixel
+                )
+
+                $codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() |
+                    Where-Object { $_.MimeType -eq "image/jpeg" } |
+                    Select-Object -First 1
+
+                $encoder = [System.Drawing.Imaging.Encoder]::Quality
+                $encoderParams = New-Object System.Drawing.Imaging.EncoderParameters(1)
+                $encoderParams.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter($encoder, [int64] $Quality)
+
+                if (Test-Path -LiteralPath $TargetPath) {
+                    Remove-Item -LiteralPath $TargetPath -Force
+                }
+
+                $bitmap.Save($TargetPath, $codec, $encoderParams)
+            } finally {
+                $graphics.Dispose()
+            }
+        } finally {
+            $bitmap.Dispose()
+        }
+    } finally {
+        $source.Dispose()
+    }
+}
+
 function Invoke-WiaScan {
+    param(
+        [bool] $AutoCrop = $false
+    )
+
     $jpegFormat = "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}"
     $scannerDeviceType = 1
     $intentUnspecified = 0
     $biasMaximizeQuality = 131072
 
     $scanId = [guid]::NewGuid().ToString("N")
+    $rawPath = Join-Path $env:TEMP ("las_naves_scan_raw_{0}.jpg" -f $scanId)
     $tempPath = Join-Path $env:TEMP ("las_naves_scan_{0}.jpg" -f $scanId)
     $diagnosticPath = $null
 
@@ -104,11 +338,20 @@ function Invoke-WiaScan {
             throw "WIA no pudo convertir la imagen escaneada a JPG."
         }
 
-        if (Test-Path -LiteralPath $tempPath) {
-            Remove-Item -LiteralPath $tempPath -Force
+        foreach ($pathToDelete in @($rawPath, $tempPath)) {
+            if (Test-Path -LiteralPath $pathToDelete) {
+                Remove-Item -LiteralPath $pathToDelete -Force
+            }
         }
 
-        $jpegImage.SaveFile($tempPath)
+        $jpegImage.SaveFile($rawPath)
+
+        try {
+            Save-OptimizedJpeg -SourcePath $rawPath -TargetPath $tempPath -AutoCrop $AutoCrop
+        } catch {
+            Write-Log "No se pudo optimizar la imagen; se enviara la captura original. Detalle: $($_.Exception.Message)"
+            Copy-Item -LiteralPath $rawPath -Destination $tempPath -Force
+        }
 
         if (!(Test-Path -LiteralPath $tempPath)) {
             throw "WIA no generó el archivo temporal del escaneo."
@@ -120,7 +363,7 @@ function Invoke-WiaScan {
         }
 
         if ($KeepDiagnosticCopies) {
-            $diagnosticFolder = Join-Path $PSScriptRoot "ultimos-escaneos"
+            $diagnosticFolder = Get-DiagnosticFolder
             if (!(Test-Path -LiteralPath $diagnosticFolder)) {
                 New-Item -Path $diagnosticFolder -ItemType Directory | Out-Null
             }
@@ -142,11 +385,14 @@ function Invoke-WiaScan {
             mime = "image/jpeg"
             bytes = $bytes.Length
             diagnostic_copy = $diagnosticPath
+            preview_url = "http://127.0.0.1:$Port/last-scan.jpg?ts=$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
             image = "data:image/jpeg;base64,$base64"
         }
     } finally {
-        if (Test-Path -LiteralPath $tempPath) {
-            Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+        foreach ($pathToDelete in @($rawPath, $tempPath)) {
+            if (Test-Path -LiteralPath $pathToDelete) {
+                Remove-Item -LiteralPath $pathToDelete -Force -ErrorAction SilentlyContinue
+            }
         }
     }
 }
@@ -154,6 +400,7 @@ function Invoke-WiaScan {
 function Read-HttpRequest {
     param([System.Net.Sockets.NetworkStream] $Stream)
 
+    $Stream.ReadTimeout = 3000
     $buffer = New-Object byte[] 65536
     $builder = New-Object System.Text.StringBuilder
 
@@ -169,7 +416,48 @@ function Read-HttpRequest {
         }
     } while ($Stream.DataAvailable)
 
+    $requestText = $builder.ToString()
+    $headersText = ($requestText -split "`r`n`r`n", 2)[0]
+    $bodyText = if ($requestText.Contains("`r`n`r`n")) { ($requestText -split "`r`n`r`n", 2)[1] } else { "" }
+    $contentLength = 0
+
+    foreach ($headerLine in ($headersText -split "`r`n")) {
+        if ($headerLine -match '^Content-Length:\s*(\d+)\s*$') {
+            $contentLength = [int] $matches[1]
+            break
+        }
+    }
+
+    while ($contentLength -gt 0 -and ([System.Text.Encoding]::UTF8.GetByteCount($bodyText) -lt $contentLength)) {
+        $remaining = $contentLength - [System.Text.Encoding]::UTF8.GetByteCount($bodyText)
+        $read = $Stream.Read($buffer, 0, [Math]::Min($buffer.Length, $remaining))
+        if ($read -le 0) { break }
+
+        $chunk = [System.Text.Encoding]::UTF8.GetString($buffer, 0, $read)
+        [void] $builder.Append($chunk)
+        $bodyText += $chunk
+    }
+
     return $builder.ToString()
+}
+
+function Get-RequestJson {
+    param([string] $Request)
+
+    if (!$Request.Contains("`r`n`r`n")) {
+        return $null
+    }
+
+    $body = ($Request -split "`r`n`r`n", 2)[1]
+    if ([string]::IsNullOrWhiteSpace($body)) {
+        return $null
+    }
+
+    try {
+        return ($body | ConvertFrom-Json)
+    } catch {
+        return $null
+    }
 }
 
 $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Parse($HostAddress), $Port)
@@ -192,10 +480,20 @@ try {
 
             if ($method -eq "OPTIONS") {
                 $response = New-OptionsResponse
+            } elseif ($method -eq "GET" -and $path -like "/health*") {
+                $response = New-HttpResponse -StatusCode 200 -Body (ConvertTo-JsonText @{
+                    ok = $true
+                    service = "las-naves-scanner"
+                    scan_url = "http://127.0.0.1:$Port/scan"
+                    preview_url = "http://127.0.0.1:$Port/last-scan.jpg"
+                    last_scan = (Get-LastScanPath)
+                })
+            } elseif ($method -eq "GET" -and $path -like "/last-scan.jpg*") {
+                $response = New-LastScanResponse
             } elseif ($method -ne "POST") {
                 $response = New-HttpResponse -StatusCode 405 -Body (ConvertTo-JsonText @{
                     ok = $false
-                    message = "Use POST /scan."
+                    message = "Use POST /scan o GET /last-scan.jpg."
                 })
             } elseif ($path -notlike "/scan*") {
                 $response = New-HttpResponse -StatusCode 404 -Body (ConvertTo-JsonText @{
@@ -204,7 +502,18 @@ try {
                 })
             } else {
                 Write-Log "Solicitud de escaneo recibida."
-                $scan = Invoke-WiaScan
+                $payload = Get-RequestJson -Request $request
+                $autoCrop = $false
+
+                if ($null -ne $payload) {
+                    $autoCrop = [bool]($payload.auto_crop -or $payload.autoCrop -or $payload.crop_document -or $payload.cropDocument)
+                }
+
+                if ($autoCrop) {
+                    Write-Log "Recorte automatico solicitado por el navegador."
+                }
+
+                $scan = Invoke-WiaScan -AutoCrop $autoCrop
                 $response = New-HttpResponse -StatusCode 200 -Body (ConvertTo-JsonText $scan)
                 Write-Log "Escaneo enviado al navegador."
             }

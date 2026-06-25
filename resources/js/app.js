@@ -250,8 +250,30 @@ if (scannerDialog instanceof HTMLDialogElement) {
 
   const buttonLabel = () => {
     if (!scanState) return 'Escanear';
+    if (scanState.readyToSubmit) return scanState.steps.length === 4 ? 'Generar PDF consolidado' : 'Generar PDF';
     if (scanState.currentIndex === 0) return 'Escanear';
     return scanState.currentIndex === scanState.steps.length - 1 ? 'Finalizar' : 'Continuar';
+  };
+
+  const dataUrlToObjectUrl = (dataUrl) => {
+    const matches = dataUrl.match(/^data:(image\/jpe?g);base64,([A-Za-z0-9+/=]+)$/i);
+    if (!matches) return null;
+
+    const binary = atob(matches[2]);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return URL.createObjectURL(new Blob([bytes], { type: matches[1] }));
+  };
+
+  const formatBytes = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} bytes`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   };
 
   const renderScanner = () => {
@@ -260,8 +282,14 @@ if (scannerDialog instanceof HTMLDialogElement) {
     const currentStep = scanState.steps[scanState.currentIndex];
     title.textContent = scanState.requirementLabel || 'Escanear documento';
     stepCounter.textContent = `Paso ${scanState.currentIndex + 1} de ${scanState.steps.length}`;
-    status.textContent = scanState.busy ? 'Escaneando documento...' : currentStep.title;
-    instruction.textContent = currentStep.instruction;
+    status.textContent = scanState.readyToSubmit
+      ? 'Capturas listas para revisar'
+      : (scanState.busy ? 'Escaneando documento...' : currentStep.title);
+    instruction.textContent = scanState.readyToSubmit
+      ? (scanState.steps.length === 4
+        ? 'Revise las cuatro imágenes. Si están correctas, genere un solo PDF para cédula y papeleta.'
+        : 'Revise la imagen. Si está correcta, genere el PDF del documento.')
+      : currentStep.instruction;
     nextButton.disabled = scanState.busy;
     nextButton.innerHTML = scanState.busy
       ? 'Escaneando...'
@@ -272,8 +300,13 @@ if (scannerDialog instanceof HTMLDialogElement) {
       return `
         <article class="scanner-preview ${capture ? 'has-scan' : ''}">
           <strong>${index + 1}. ${step.title}</strong>
-          ${capture ? `<img src="${capture.image}" alt="${step.title}">` : '<span>Pendiente</span>'}
-          ${capture ? `<button class="doc-action" type="button" data-repeat-scan="${index}" aria-label="Repetir ${step.title}" title="Repetir captura"><i data-lucide="refresh-cw"></i></button>` : ''}
+          ${capture ? `<img src="${capture.previewUrl || capture.image}" alt="${step.title}" data-fallback-src="${capture.image}"><small>${formatBytes(capture.bytes)}</small>` : '<span>Pendiente</span>'}
+          ${capture ? `
+            <div class="scanner-preview-actions">
+              <a class="doc-action" href="${capture.previewUrl || capture.image}" target="_blank" rel="noopener" aria-label="Ver ${step.title}" title="Ver imagen"><i data-lucide="eye"></i></a>
+              <button class="doc-action" type="button" data-repeat-scan="${index}" aria-label="Repetir ${step.title}" title="Repetir captura"><i data-lucide="refresh-cw"></i></button>
+            </div>
+          ` : ''}
         </article>
       `;
     }).join('');
@@ -323,6 +356,7 @@ if (scannerDialog instanceof HTMLDialogElement) {
           key: step.key,
           title: step.title,
           instruction: step.instruction,
+          auto_crop: Boolean(scanState.autoCrop),
         }),
       });
     } catch (error) {
@@ -341,7 +375,12 @@ if (scannerDialog instanceof HTMLDialogElement) {
       throw new Error('La imagen escaneada está vacía o no es JPG.');
     }
 
-    return image;
+    const servicePreviewUrl = payload.preview_url || payload.previewUrl || payload.preview || payload.url || null;
+    const previewUrl = servicePreviewUrl || dataUrlToObjectUrl(image);
+    const base64 = image.split(',', 2)[1] || '';
+    const bytes = Math.floor((base64.length * 3) / 4);
+
+    return { image, previewUrl, bytes };
   };
 
   const submitScannedDocument = async () => {
@@ -402,14 +441,19 @@ if (scannerDialog instanceof HTMLDialogElement) {
   nextButton?.addEventListener('click', async () => {
     if (!scanState || scanState.busy) return;
 
+    if (scanState.readyToSubmit) {
+      await submitScannedDocument();
+      return;
+    }
+
     const currentStep = scanState.steps[scanState.currentIndex];
     clearScannerError();
     scanState.busy = true;
     renderScanner();
 
     try {
-      const image = await requestLocalScan(currentStep);
-      scanState.captures[currentStep.key] = { image };
+      const capture = await requestLocalScan(currentStep);
+      scanState.captures[currentStep.key] = capture;
       scanState.busy = false;
 
       if (scanState.currentIndex < scanState.steps.length - 1) {
@@ -419,8 +463,9 @@ if (scannerDialog instanceof HTMLDialogElement) {
         return;
       }
 
+      scanState.readyToSubmit = true;
       renderScanner();
-      await submitScannedDocument();
+      status.textContent = 'Revise las imágenes antes de generar el PDF.';
     } catch (error) {
       scanState.busy = false;
       renderScanner();
@@ -434,9 +479,23 @@ if (scannerDialog instanceof HTMLDialogElement) {
 
     scanState.currentIndex = Number(repeatButton.dataset.repeatScan || 0);
     delete scanState.captures[scanState.steps[scanState.currentIndex].key];
+    scanState.readyToSubmit = false;
     clearScannerError();
     renderScanner();
   });
+
+  previews?.addEventListener('error', (event) => {
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement)) return;
+
+    const fallback = image.dataset.fallbackSrc;
+    if (fallback && image.src !== fallback) {
+      image.src = fallback;
+      return;
+    }
+
+    showScannerError('La captura llegó al sistema, pero el navegador no pudo mostrar la vista previa. Use el botón de ver imagen o continúe si la copia del escáner es correcta.');
+  }, true);
 
   const closeScanner = () => {
     scanState = null;
@@ -460,9 +519,11 @@ if (scannerDialog instanceof HTMLDialogElement) {
       signatureCheckbox,
       statusSelect,
       steps,
+      autoCrop: steps === identityScanSteps,
       captures: {},
       currentIndex: 0,
       busy: false,
+      readyToSubmit: false,
     };
 
     clearScannerError();
