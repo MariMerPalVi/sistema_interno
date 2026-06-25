@@ -17,6 +17,7 @@ Aplicacion Laravel + Vite para procesos internos de una cooperativa. La primera 
 - Seleccion de servicios adicionales y documentos firmados por servicio.
 - Check List del expediente con documentos adjuntados e historial de auditoria.
 - Revision digital automatica del expediente, con estado aprobado u observado, puntaje y hallazgos.
+- Escaneo local asistido mediante servicio Windows en cada computador del asesor.
 
 ## Requisitos locales
 
@@ -77,6 +78,22 @@ npm.cmd run build
 ```text
 http://localhost/sistema_interno/public
 ```
+
+## Escaner local
+
+Para usar el boton `Escanear`, cada computador que tenga escaner debe ejecutar:
+
+```text
+scanner-service\iniciar-escaner.bat
+```
+
+Ese servicio local responde en:
+
+```env
+SCANNER_SERVICE_URL=http://127.0.0.1:8765/scan
+```
+
+Mantenga la ventana del servicio abierta mientras use el sistema. Si el servicio no esta abierto o el escaner no responde, el sistema permite continuar con carga manual de archivos.
 
 ## Desarrollo con Vite
 

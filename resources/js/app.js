@@ -330,7 +330,8 @@ if (scannerDialog instanceof HTMLDialogElement) {
     }
 
     if (!response.ok) {
-      throw new Error('El servicio local de escaneo no respondió correctamente.');
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || 'El servicio local de escaneo no respondió correctamente.');
     }
 
     const payload = await response.json();
