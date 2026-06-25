@@ -6,7 +6,7 @@
     $serviceDocs = $opening->documents->where('document_scope', 'servicio')->keyBy('internal_document_template_id');
     $externalDocs = $opening->externalEvidences->keyBy(fn ($evidence) => $evidence->subject_key.'_'.$evidence->external_check_item_id);
     $selectedServices = $opening->services->pluck('additional_service_id')->all();
-    $consentComplete = $workflow['complete']['consentimiento'];
+    $consentComplete = optional($opening->consent)->status === 'validado';
     $spouseRequirementIds = $opening->accountType->requirements->filter(fn ($requirement) => $requirement->type->slug === 'documentos-conyuge')->pluck('id');
     $optionalRequirements = $opening->accountType->requirements->where('is_required', false)->reject(fn ($requirement) => $requirement->type->slug === 'documentos-conyuge');
     $optionalSelectionHistory = $opening->histories->where('action', 'seleccionar_requisitos_opcionales')->sortByDesc('id')->first();
@@ -27,7 +27,8 @@
         ->merge($selectedOptionalRequirementIds)
         ->unique();
     $loadedRequirementIds = $opening->documents->where('document_scope', 'requisito')->whereIn('status', ['cargado', 'validado'])->pluck('account_type_requirement_id');
-    $requirementsComplete = $requiredRequirementIds->diff($loadedRequirementIds)->isEmpty();
+    $requirementsDocumentsComplete = $requiredRequirementIds->diff($loadedRequirementIds)->isEmpty();
+    $requirementsComplete = $requirementsDocumentsComplete && $consentComplete;
     $requiredExternalIds = $externalChecks->where('is_required', true)->pluck('id');
     $externalComplete = collect(array_keys($externalSubjects))->every(function ($subjectKey) use ($opening, $requiredExternalIds) {
         $loadedExternalIds = $opening->externalEvidences
@@ -42,6 +43,7 @@
     $internalComplete = $requiredInternalIds->diff($loadedInternalIds)->isEmpty();
     $servicesSelectionSaved = $opening->histories->contains('action', 'seleccionar_servicios');
     $serviceTemplatesBySlug = $serviceTemplates->keyBy('slug');
+    $scannerServiceUrl = config('opening.scanner_service_url');
     $fondoDecision = data_get(
         $opening->histories->where('action', 'seleccionar_servicios')->sortByDesc('id')->first()?->metadata,
         'fondo_mortuorio'
@@ -68,13 +70,12 @@
     $loadedServiceIds = $opening->documents->where('document_scope', 'servicio')->whereIn('status', ['cargado', 'validado'])->pluck('internal_document_template_id');
     $serviceDocsComplete = $servicesComplete && $availableRequiredServiceTemplateIds->diff($loadedServiceIds)->isEmpty();
     $steps = [
-        'consentimiento' => '1. Consentimiento',
-        'requisitos' => '2. Requisitos',
-        'externas' => '3. Consultas',
-        'expediente' => '4. Expediente',
-        'internos' => '5. Internos',
-        'servicios' => '6. Servicios',
-        'resumen' => '7. Check List',
+        'requisitos' => '1. Requisitos',
+        'externas' => '2. Lista de control',
+        'expediente' => '3. Expediente',
+        'internos' => '4. Internos',
+        'servicios' => '5. Otros',
+        'resumen' => '6. Check List',
     ];
     $storageRoot = storage_path('app/private');
     $expedientStoragePath = $storageRoot.DIRECTORY_SEPARATOR.'aperturas'.DIRECTORY_SEPARATOR.str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $opening->storage_folder);
@@ -117,48 +118,6 @@
         @endforeach
     </nav>
     @endunless
-
-    @if ($activeStep === 'consentimiento')
-    <section id="consentimiento" class="panel">
-        <div class="panel-head">
-            <h2 class="panel-title"><i data-lucide="shield-check"></i> Consentimiento de datos personales</h2>
-            @include('partials.badge', ['status' => optional($opening->consent)->status ?? 'pendiente'])
-        </div>
-        <div class="step-guidance">
-            <i data-lucide="clipboard-check"></i>
-            <span>Abra el consentimiento editable, complete los datos, imprímalo y solicite la firma. Luego cargue el archivo firmado, marque <strong>Firma revisada</strong> y presione <strong>Subir y validar</strong>.</span>
-        </div>
-        <div class="consent-actions" aria-label="Acciones del consentimiento">
-            <a class="doc-action" href="{{ route('accounts.consent.edit', $opening) }}" target="_blank" aria-label="Editar consentimiento" data-tooltip="Editar consentimiento">
-                <i data-lucide="file-pen-line"></i>
-            </a>
-            <a class="doc-action" href="{{ asset('formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf') }}" target="_blank" aria-label="Ver formato original" data-tooltip="Ver formato original">
-                <i data-lucide="file-search"></i>
-            </a>
-            @if ($consentComplete)
-                <a class="doc-action" href="{{ route('accounts.consent.preview', $opening) }}" target="_blank" aria-label="Previsualizar documento cargado" data-tooltip="Previsualizar documento cargado">
-                    <i data-lucide="eye"></i>
-                </a>
-                <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'requisitos']) }}">Continuar <i data-lucide="arrow-right"></i></a>
-            @endif
-        </div>
-        @if ($consentComplete)
-            <div class="preview-box">
-                <iframe src="{{ route('accounts.consent.preview', $opening) }}" title="Vista previa del consentimiento firmado"></iframe>
-            </div>
-        @endif
-        <form class="upload-row" method="post" enctype="multipart/form-data" action="{{ route('accounts.consent.upload', $opening) }}" data-requires-signature="1" data-signature-label="consentimiento de datos personales">
-            @csrf
-            <input type="file" name="signed_file" accept=".pdf,.jpg,.jpeg,.png" required>
-            <label class="check consent-signature-check" title="Confirme que revisó visualmente la firma">
-                <input type="checkbox" name="manual_signature_confirmed" value="1">
-                Firma revisada
-            </label>
-            <input name="observations" placeholder="Observación">
-            <button class="button primary" type="submit"><i data-lucide="upload"></i> Subir y validar</button>
-        </form>
-    </section>
-    @endif
 
     @if ($activeStep === 'requisitos')
     <section id="requisitos" class="panel">
@@ -267,11 +226,163 @@
                             <option value="rechazado">Rechazado</option>
                         </select>
                         <input name="observations" placeholder="Observación si aplica">
-                        <button class="button secondary" type="submit"><i data-lucide="{{ $doc ? 'refresh-cw' : 'upload' }}"></i> {{ $doc ? 'Reemplazar' : 'Subir' }}</button>
+                        <div class="upload-actions">
+                            <button
+                                class="button scanner-trigger"
+                                type="button"
+                                data-scan-requirement
+                                data-requirement-id="{{ $requirement->id }}"
+                                data-requirement-label="{{ $requirement->label }}"
+                                data-requirement-slug="{{ $requirement->type->slug }}"
+                                data-scan-url="{{ route('accounts.requirements.scan', $opening) }}"
+                                data-scanner-url="{{ $scannerServiceUrl }}"
+                            >
+                                <i data-lucide="file-search"></i> Escanear
+                            </button>
+                            <button class="button secondary" type="submit"><i data-lucide="{{ $doc ? 'refresh-cw' : 'upload' }}"></i> {{ $doc ? 'Reemplazar' : 'Subir' }}</button>
+                        </div>
                     </form>
                 </article>
             @endforeach
         </div>
+
+        <section class="embedded-consent" aria-labelledby="embedded-consent-title">
+            <div class="embedded-consent-main">
+                <div>
+                    <h3 id="embedded-consent-title"><i data-lucide="shield-check"></i> Consentimiento de datos personales</h3>
+                    <p>Complete el formato editable con los datos extraídos, imprima, firme y cargue el documento firmado.</p>
+                </div>
+                @include('partials.badge', ['status' => optional($opening->consent)->status ?? 'pendiente'])
+            </div>
+
+            <div class="doc-actions consent-inline-actions">
+                <button class="doc-action" type="button" data-open-dialog="consent-data-dialog" aria-label="Abrir consentimiento editable" data-tooltip="Abrir editable">
+                    <i data-lucide="file-pen-line"></i>
+                </button>
+                <a class="doc-action" href="{{ asset('formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf') }}" target="_blank" aria-label="Ver formato original" data-tooltip="Ver original">
+                    <i data-lucide="file-search"></i>
+                </a>
+                @if ($consentComplete)
+                    <a class="doc-action" href="{{ route('accounts.consent.preview', $opening) }}" target="_blank" aria-label="Previsualizar consentimiento cargado" data-tooltip="Previsualizar cargado">
+                        <i data-lucide="eye"></i>
+                    </a>
+                @endif
+            </div>
+
+            <form class="upload-row consent-upload-row" method="post" enctype="multipart/form-data" action="{{ route('accounts.consent.upload', $opening) }}" data-requires-signature="1" data-signature-label="consentimiento de datos personales">
+                @csrf
+                <input type="file" name="signed_file" accept=".pdf,.jpg,.jpeg,.png" required>
+                <label class="check consent-signature-check" title="Confirme que revisó visualmente la firma">
+                    <input type="checkbox" name="manual_signature_confirmed" value="1">
+                    Firma revisada
+                </label>
+                <input name="observations" placeholder="Observación">
+                <div class="upload-actions">
+                    <button
+                        class="button scanner-trigger"
+                        type="button"
+                        data-scan-document
+                        data-scan-url="{{ route('accounts.consent.scan', $opening) }}"
+                        data-scanner-url="{{ $scannerServiceUrl }}"
+                        data-document-label="Consentimiento de datos personales"
+                        data-requires-signature="1"
+                    >
+                        <i data-lucide="file-search"></i> Escanear
+                    </button>
+                    <button class="button primary" type="submit"><i data-lucide="upload"></i> Subir y validar</button>
+                </div>
+            </form>
+        </section>
+
+        <dialog class="app-dialog" id="consent-data-dialog">
+            <form class="dialog-card consent-data-form" method="get" action="{{ route('accounts.consent.edit', $opening) }}" target="_blank">
+                <div class="dialog-head">
+                    <div>
+                        <span class="eyebrow">Datos del consentimiento</span>
+                        <h3>Revise y complete</h3>
+                    </div>
+                    <button class="doc-action" type="button" data-close-dialog aria-label="Cerrar" data-tooltip="Cerrar">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <div class="dialog-fields">
+                    <fieldset class="dialog-choice" data-person-type-choice>
+                        <legend>Tipo de titular</legend>
+                        <label>
+                            <input type="radio" name="tipo_persona" value="natural" @checked(($consentDefaults['tipo_persona'] ?? 'natural') === 'natural')>
+                            Persona natural
+                        </label>
+                        <label>
+                            <input type="radio" name="tipo_persona" value="juridica" @checked(($consentDefaults['tipo_persona'] ?? 'natural') === 'juridica')>
+                            Persona jurídica
+                        </label>
+                    </fieldset>
+
+                    <div class="dialog-field-panel" data-person-type-panel="natural">
+                        <label>Apellidos y nombres
+                            <input name="apellidos_nombres" value="{{ $consentDefaults['apellidos_nombres'] ?? '' }}" autocomplete="off">
+                        </label>
+                        <label>Cédula de identidad
+                            <input name="cedula_identidad" value="{{ $consentDefaults['cedula_identidad'] ?? '' }}" autocomplete="off">
+                        </label>
+                        <label>Correo electrónico
+                            <input type="email" name="correo" value="{{ $consentDefaults['correo'] ?? '' }}" placeholder="correo@ejemplo.com">
+                        </label>
+                        <label>Número de celular
+                            <input name="celular" value="{{ $consentDefaults['celular'] ?? '' }}" placeholder="09xxxxxxxx">
+                        </label>
+                        <label>Dirección
+                            <input name="direccion" value="{{ $consentDefaults['direccion'] ?? '' }}" autocomplete="off">
+                        </label>
+                    </div>
+
+                    <div class="dialog-field-panel" data-person-type-panel="juridica">
+                        <label>Razón social
+                            <input name="razon_social" value="{{ $consentDefaults['razon_social'] ?? '' }}" autocomplete="off">
+                        </label>
+                        <label>RUC
+                            <input name="ruc" value="{{ $consentDefaults['ruc'] ?? '' }}" autocomplete="off">
+                        </label>
+                        <label>Representante legal
+                            <input name="representante_legal" value="{{ $consentDefaults['representante_legal'] ?? '' }}" autocomplete="off">
+                        </label>
+                        <label>Cédula del representante
+                            <input name="cedula_representante" value="{{ $consentDefaults['cedula_representante'] ?? '' }}" autocomplete="off">
+                        </label>
+                        <label>Correo electrónico
+                            <input type="email" name="correo_juridico" value="{{ $consentDefaults['correo_juridico'] ?? '' }}" placeholder="correo@ejemplo.com">
+                        </label>
+                        <label>Número de celular
+                            <input name="celular_juridico" value="{{ $consentDefaults['celular_juridico'] ?? '' }}" placeholder="09xxxxxxxx">
+                        </label>
+                    </div>
+
+                    <div class="dialog-field-panel dialog-common-fields">
+                        <label>Ciudad
+                            <input name="ciudad" value="{{ $consentDefaults['ciudad'] ?? '' }}">
+                        </label>
+                        <label>Día
+                            <input name="dia" value="{{ $consentDefaults['dia'] ?? now()->format('d') }}">
+                        </label>
+                        <label>Mes
+                            <input name="mes" value="{{ $consentDefaults['mes'] ?? now()->locale('es')->translatedFormat('F') }}">
+                        </label>
+                        <label>Año
+                            <input name="anio" value="{{ $consentDefaults['anio'] ?? now()->format('Y') }}">
+                        </label>
+                    </div>
+                    <input type="hidden" name="tipo_cuenta" value="{{ $consentDefaults['tipo_cuenta'] ?? $opening->accountType->name }}">
+                </div>
+                <div class="dialog-actions">
+                    <button class="button secondary" type="button" data-close-dialog>Cancelar</button>
+                    <button class="button primary" type="submit"><i data-lucide="file-pen-line"></i> Abrir editable</button>
+                </div>
+            </form>
+        </dialog>
+
+        @if ($requirementsDocumentsComplete && !$consentComplete)
+            <p class="step-note">Para continuar, cargue y valide el consentimiento firmado.</p>
+        @endif
         @if ($requirementsComplete)
             <div class="actions">
                 <a class="button primary" href="{{ route('accounts.show', [$opening, 'paso' => 'externas']) }}">Continuar <i data-lucide="arrow-right"></i></a>
@@ -441,7 +552,21 @@
                             <option value="validado">Validado</option>
                             <option value="rechazado">Rechazado</option>
                         </select>
-                        <button class="button secondary" type="submit"><i data-lucide="{{ $doc ? 'refresh-cw' : 'upload' }}"></i> {{ $doc ? 'Reemplazar' : 'Subir' }}</button>
+                        <div class="upload-actions">
+                            <button
+                                class="button scanner-trigger"
+                                type="button"
+                                data-scan-document
+                                data-scan-url="{{ route('accounts.internal.scan', $opening) }}"
+                                data-scanner-url="{{ $scannerServiceUrl }}"
+                                data-template-id="{{ $template->id }}"
+                                data-document-label="{{ $template->name }}"
+                                data-requires-signature="{{ $template->requires_signature ? '1' : '0' }}"
+                            >
+                                <i data-lucide="file-search"></i> Escanear
+                            </button>
+                            <button class="button secondary" type="submit"><i data-lucide="{{ $doc ? 'refresh-cw' : 'upload' }}"></i> {{ $doc ? 'Reemplazar' : 'Subir' }}</button>
+                        </div>
                     </form>
                 </article>
             @endforeach
@@ -457,7 +582,7 @@
     @if ($activeStep === 'servicios')
     <section id="servicios" class="panel">
         <div class="panel-head">
-            <h2>Servicios adicionales</h2>
+            <h2>Fondo mortuorio / Certificado de aportación</h2>
             <span class="hint">La selección queda registrada en el expediente.</span>
         </div>
         <form method="post" action="{{ route('accounts.services.save', $opening) }}">
@@ -470,7 +595,7 @@
                 </fieldset>
                 @if ($contributionCertificateApplies)
                     <fieldset class="service-option service-decision">
-                        <legend>Tipo de vinculación</legend>
+                        <legend>Tipo de vinculación (Certificado de aportación)</legend>
                         <label><input type="radio" name="tipo_vinculacion" value="socio" @checked($membershipDecision === 'socio') required> Socio</label>
                         <label><input type="radio" name="tipo_vinculacion" value="cliente" @checked($membershipDecision === 'cliente') required> Cliente</label>
                     </fieldset>
@@ -486,11 +611,15 @@
                 @foreach ($selectedServiceDocumentTemplates as $template)
                     @php
                         $doc = $serviceDocs->get($template->id);
+                        $certificateFormatPending = $template->slug === 'certificado-de-aportacion'
+                            && blank(config("opening.agencies.{$opening->agency}.contribution_certificate.original_path"));
                     @endphp
                     <article class="check-item">
                         <div>
                             <h3>{{ $template->name }}</h3>
-                            @if (!$template->template_path)
+                            @if ($certificateFormatPending)
+                                <span class="hint">El formato del certificado de aportación para {{ $agencyName }} está pendiente de incorporar.</span>
+                            @elseif (!$template->template_path)
                                 <span class="hint">Documento pendiente de definir. Debe cargarse cuando sea generado desde el sistema.</span>
                             @elseif ($template->template_path)
                                 <div class="doc-actions">
@@ -525,7 +654,21 @@
                                 <option value="validado">Validado</option>
                                 <option value="rechazado">Rechazado</option>
                             </select>
-                            <button class="button secondary" type="submit"><i data-lucide="{{ $doc ? 'refresh-cw' : 'upload' }}"></i> {{ $doc ? 'Reemplazar' : 'Subir' }}</button>
+                            <div class="upload-actions">
+                                <button
+                                    class="button scanner-trigger"
+                                    type="button"
+                                    data-scan-document
+                                    data-scan-url="{{ route('accounts.services.documents.scan', $opening) }}"
+                                    data-scanner-url="{{ $scannerServiceUrl }}"
+                                    data-template-id="{{ $template->id }}"
+                                    data-document-label="{{ $template->name }}"
+                                    data-requires-signature="{{ $template->requires_signature ? '1' : '0' }}"
+                                >
+                                    <i data-lucide="file-search"></i> Escanear
+                                </button>
+                                <button class="button secondary" type="submit"><i data-lucide="{{ $doc ? 'refresh-cw' : 'upload' }}"></i> {{ $doc ? 'Reemplazar' : 'Subir' }}</button>
+                            </div>
                         </form>
                     </article>
                 @endforeach
@@ -624,4 +767,34 @@
         </div>
     </section>
     @endif
+
+    <dialog class="app-dialog scanner-dialog" id="scanner-dialog">
+        <form class="dialog-card scanner-card" method="dialog">
+            <div class="dialog-head">
+                <div>
+                    <span class="eyebrow">Escaneo directo</span>
+                    <h3 id="scanner-dialog-title">Escanear documento</h3>
+                </div>
+                <button class="doc-action" type="button" data-scanner-close aria-label="Cerrar" data-tooltip="Cerrar">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div class="scanner-progress" aria-live="polite">
+                <span data-scanner-step-counter>Paso 1 de 1</span>
+                <strong data-scanner-status>Coloque el documento en el escáner.</strong>
+            </div>
+
+            <p class="scanner-instruction" data-scanner-instruction>Coloque el documento en el escáner y presione Escanear.</p>
+            <p class="scanner-error" data-scanner-error hidden></p>
+
+            <div class="scanner-preview-grid" data-scanner-previews></div>
+
+            <div class="dialog-actions scanner-actions">
+                <button class="button secondary" type="button" data-scanner-cancel>Cancelar</button>
+                <button class="button secondary" type="button" data-scanner-repeat hidden><i data-lucide="refresh-cw"></i> Repetir captura</button>
+                <button class="button primary" type="button" data-scanner-next><i data-lucide="file-search"></i> Escanear</button>
+            </div>
+        </form>
+    </dialog>
 @endsection

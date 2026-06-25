@@ -17,16 +17,16 @@
         : '42010101'.str_pad(substr($accountDigits, -4), 4, '0', STR_PAD_LEFT);
     $memberCode = $fields['codigo_socio'] ?? $opening->file_name;
     $accountType = $fields['tipo_cuenta'] ?? $opening->accountType->name;
-    $city = $fields['ciudad'] ?? 'Las Naves';
+    $city = $fields['ciudad'] ?? config("opening.agencies.{$opening->agency}.document_place", 'Las Naves');
     $day = $fields['dia'] ?? now()->format('d');
     $month = $fields['mes'] ?? now()->locale('es')->translatedFormat('F');
     $year = $fields['anio'] ?? now()->format('Y');
     $yearSuffix = substr((string) $year, -1);
     $requestType = $fields['tipo_solicitante'] ?? 'socio';
     $mortuaryFund = $fields['fondo_mortuorio'] ?? 'no';
-    $nominalValue = filled($fields['valor_nominal'] ?? null)
-        ? $fields['valor_nominal']
-        : '35.00 (Treinta y cinco dólares americanos)';
+    $nominalValue = $fields['valor_nominal'] ?? '';
+    $certificateProfile = $fields['certificate_profile']
+        ?? config("opening.agencies.{$opening->agency}.contribution_certificate", []);
 @endphp
 <!doctype html>
 <html lang="es">
@@ -1548,11 +1548,11 @@
                 <h1>CERTIFICADO DE APORTACIÓN</h1>
 
                 <div class="certificate-office">
-                    <strong>MATRIZ LAS NAVES</strong>
-                    <span>Dir: Calle 10 de octubre y 10 de Agosto</span>
-                    <span>Permiso de Funcionamiento: SEPS-INFERS-DNGRF-TF-2022-0534</span>
-                    <span>Código de Oficina: 0495</span>
-                    <span>Fecha de Registro: 2022-08-04</span>
+                    <strong>{{ $certificateProfile['office'] ?? strtoupper($city) }}</strong>
+                    <span>Dir: {{ $certificateProfile['address'] ?? '' }}</span>
+                    <span>Permiso de Funcionamiento: {{ $certificateProfile['permit'] ?? '' }}</span>
+                    <span>Código de Oficina: {{ $certificateProfile['office_code'] ?? '' }}</span>
+                    <span>Fecha de Registro: {{ $certificateProfile['registration_date'] ?? '' }}</span>
                 </div>
 
                 <p class="certificate-copy">
@@ -1579,7 +1579,7 @@
                 </div>
 
                 <p class="certificate-date">
-                    Las Naves,
+                    {{ $city }},
                     <span class="certificate-field" contenteditable="true" spellcheck="false">{{ $day }}</span>
                     de <span class="certificate-field" contenteditable="true" spellcheck="false">{{ $month }}</span>
                     de <span class="certificate-field" contenteditable="true" spellcheck="false">{{ $year }}</span>

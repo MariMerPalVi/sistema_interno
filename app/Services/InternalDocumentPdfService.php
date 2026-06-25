@@ -157,6 +157,10 @@ class InternalDocumentPdfService
     private function normalizeFields(AccountOpening $opening, array $fields): array
     {
         $fields['apellidos_nombres'] = $this->singleLine($fields['apellidos_nombres'] ?? '');
+        $fields['ciudad'] = $this->singleLine($fields['ciudad'] ?? config(
+            "opening.agencies.{$opening->agency}.document_place",
+            'Las Naves'
+        ));
 
         $id = $this->digitsOnly((string) ($fields['cedula_identidad'] ?? ''));
         if (strlen($id) !== 10) {

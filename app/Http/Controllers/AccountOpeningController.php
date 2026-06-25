@@ -72,7 +72,7 @@ class AccountOpeningController extends Controller
             return $opening;
         });
 
-        return redirect()->route('accounts.show', $opening)->with('success', 'Proceso iniciado. Complete el consentimiento para continuar.');
+        return redirect()->route('accounts.show', $opening)->with('success', 'Proceso iniciado. Cargue primero los requisitos.');
     }
 
     public function show(Request $request, AccountOpening $opening)
@@ -127,13 +127,23 @@ class AccountOpeningController extends Controller
             'fields' => array_merge(
                 $this->consentDocumentDefaults($opening),
                 $request->only([
+                    'tipo_persona',
                     'apellidos_nombres',
                     'cedula_identidad',
+                    'razon_social',
+                    'ruc',
+                    'representante_legal',
+                    'cedula_representante',
                     'ciudad',
                     'dia',
                     'mes',
                     'anio',
                     'tipo_cuenta',
+                    'correo',
+                    'celular',
+                    'correo_juridico',
+                    'celular_juridico',
+                    'direccion',
                 ])
             ),
         ]);
@@ -200,7 +210,7 @@ class AccountOpeningController extends Controller
         );
         if ($signatureError) {
             return redirect()
-                ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
+                ->route('accounts.show', [$opening, 'paso' => 'requisitos'])
                 ->withErrors($signatureError);
         }
 
@@ -233,6 +243,74 @@ class AccountOpeningController extends Controller
             ->with('success', 'Consentimiento validado. Puede continuar con los requisitos.');
     }
 
+    public function uploadScannedConsent(Request $request, AccountOpening $opening)
+    {
+        $data = $request->validate([
+            'captures' => ['required', 'array'],
+            'captures.*.key' => ['required', 'string', 'max:80'],
+            'captures.*.title' => ['required', 'string', 'max:120'],
+            'captures.*.image' => ['required', 'string'],
+            'manual_signature_confirmed' => ['required', 'accepted'],
+            'observations' => ['nullable', 'string', 'max:500'],
+        ], [
+            'manual_signature_confirmed.required' => 'Debe revisar visualmente el consentimiento y confirmar que contiene la firma.',
+            'manual_signature_confirmed.accepted' => 'Debe confirmar manualmente que el consentimiento contiene firma.',
+        ]);
+
+        $scanned = $this->storeScannedDocumentPdf(
+            $opening,
+            $data['captures'],
+            'Consentimiento para el Tratamiento de Datos Personales_{expediente}',
+            'consentimiento'
+        );
+        [$scannedFile, $tempPath] = $this->temporaryUploadedFileFromStorage($scanned['path'], $scanned['file_name']);
+
+        $signatureValidator = app(SignatureValidationService::class);
+        $signatureError = $signatureValidator->validationError(
+            $scannedFile,
+            'formatos/CONSENTIMIENTO_DE_DATOS_PERSONALES_LAS_NAVES.pdf'
+        );
+
+        if ($signatureError) {
+            @unlink($tempPath);
+
+            return response()->json(['message' => $signatureError], 422);
+        }
+
+        $autoSignal = $signatureValidator->hasAutomaticSignal($scannedFile);
+        $consentData = app(DocumentExtractionService::class)->extract(
+            'cedula',
+            $scannedFile,
+            config('opening.ocr_on_upload', false)
+        );
+        @unlink($tempPath);
+
+        $consentData['capturas_escaneadas'] = $scanned['captures'];
+        $consentData['flujo_escaneo'] = 'documento_simple';
+
+        $opening->consent()->updateOrCreate(
+            ['account_opening_id' => $opening->id],
+            [
+                'signed_file_path' => $scanned['path'],
+                'status' => 'validado',
+                'auto_signature_detected' => $autoSignal,
+                'manual_signature_confirmed' => true,
+                'validated_at' => now(),
+                'observations' => $data['observations'] ?? null,
+            ]
+        );
+
+        $this->syncMemberDataFromExtraction($opening, 'cedula', $consentData);
+        $this->audit($opening, 'escanear_consentimiento', 'Consentimiento firmado escaneado y validado manualmente.');
+
+        return response()->json([
+            'message' => 'Consentimiento escaneado y validado.',
+            'file_path' => $scanned['path'],
+            'captures' => $scanned['captures'],
+            'redirect' => route('accounts.show', [$opening, 'paso' => 'requisitos']),
+        ]);
+    }
+
     public function previewConsent(AccountOpening $opening)
     {
         $consent = $opening->consent()->firstOrFail();
@@ -254,12 +332,6 @@ class AccountOpeningController extends Controller
             'observations' => ['nullable', 'string', 'max:500'],
         ]);
 
-        if (!$this->consentIsValid($opening)) {
-            return redirect()
-                ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
-                ->withErrors('No puede cargar requisitos hasta validar el consentimiento firmado.');
-        }
-
         $requirement = AccountTypeRequirement::with('type')->findOrFail($data['account_type_requirement_id']);
         $path = $this->storeFile($request->file('file'), $opening, 'requisitos', $requirement->file_name_pattern);
         $extracted = app(DocumentExtractionService::class)->extract(
@@ -269,22 +341,15 @@ class AccountOpeningController extends Controller
         );
         $this->syncMemberDataFromExtraction($opening, $requirement->type->slug, $extracted);
 
-        UploadedDocument::updateOrCreate(
-            [
-                'account_opening_id' => $opening->id,
-                'account_type_requirement_id' => $requirement->id,
-                'document_scope' => 'requisito',
-            ],
-            [
-                'display_name' => $requirement->label,
-                'file_path' => $path,
-                'original_name' => $request->file('file')->getClientOriginalName(),
-                'mime_type' => $request->file('file')->getMimeType(),
-                'file_size' => $request->file('file')->getSize(),
-                'status' => $data['status'],
-                'extracted_data' => $extracted,
-                'uploaded_by' => auth()->id(),
-            ]
+        $this->persistRequirementDocument(
+            $opening,
+            $requirement,
+            $path,
+            $request->file('file')->getClientOriginalName(),
+            $request->file('file')->getMimeType(),
+            $request->file('file')->getSize(),
+            $data['status'],
+            $extracted
         );
 
         if ($data['observations'] ?? null) {
@@ -301,6 +366,107 @@ class AccountOpeningController extends Controller
         return redirect()
             ->route('accounts.show', [$opening, 'paso' => $nextStep])
             ->with('success', 'Requisito guardado.');
+    }
+
+    public function uploadScannedRequirement(Request $request, AccountOpening $opening)
+    {
+        $data = $request->validate([
+            'account_type_requirement_id' => [
+                'required',
+                Rule::exists('account_type_requirements', 'id')->where('account_type_id', $opening->account_type_id),
+            ],
+            'captures' => ['required', 'array'],
+            'captures.*.key' => ['required', 'string', 'max:80'],
+            'captures.*.title' => ['required', 'string', 'max:120'],
+            'captures.*.image' => ['required', 'string'],
+        ]);
+
+        $requirement = AccountTypeRequirement::with('type')->findOrFail($data['account_type_requirement_id']);
+        $slug = $requirement->type->slug;
+        $captures = collect($data['captures'])->keyBy('key');
+        $expectedCaptures = $this->expectedScanCaptures($slug);
+        $missingCaptures = collect($expectedCaptures)->pluck('key')->diff($captures->keys());
+
+        if ($missingCaptures->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Debe completar todas las capturas obligatorias para finalizar.',
+                'missing' => $missingCaptures->values(),
+            ], 422);
+        }
+
+        $images = [];
+        $storedCaptures = [];
+
+        foreach ($expectedCaptures as $captureConfig) {
+            $capture = $captures->get($captureConfig['key']);
+            $jpeg = $this->decodeScannedJpeg((string) $capture['image']);
+            $captureName = $captureConfig['file_name'];
+            $capturePath = "aperturas/{$opening->storage_folder}/{$captureName}.jpg";
+
+            Storage::put($capturePath, $jpeg);
+
+            $images[] = [
+                'title' => $captureConfig['title'],
+                'jpeg' => $jpeg,
+            ];
+            $storedCaptures[] = [
+                'key' => $captureConfig['key'],
+                'title' => $captureConfig['title'],
+                'path' => $capturePath,
+            ];
+        }
+
+        $fileName = $this->buildStoredFileName($opening, $requirement->file_name_pattern ?: $requirement->label.'_{expediente}', 'pdf');
+        $path = "aperturas/{$opening->storage_folder}/{$fileName}";
+        Storage::put($path, $this->makePdfFromJpegs($images));
+
+        if (!is_dir(storage_path('tmp'))) {
+            mkdir(storage_path('tmp'), 0775, true);
+        }
+
+        $tempPath = tempnam(storage_path('tmp'), 'scan_');
+        if ($tempPath === false) {
+            return response()->json([
+                'message' => 'No se pudo preparar el archivo escaneado para validación.',
+            ], 500);
+        }
+
+        file_put_contents($tempPath, Storage::get($path));
+        $scannedFile = new UploadedFile($tempPath, $fileName, 'application/pdf', null, true);
+
+        $extracted = app(DocumentExtractionService::class)->extract(
+            $slug,
+            $scannedFile,
+            in_array($slug, ['cedula', 'cedula-papeleta', 'planilla-servicios'], true)
+        );
+        @unlink($tempPath);
+
+        $extracted['capturas_escaneadas'] = $storedCaptures;
+        $extracted['flujo_escaneo'] = count($expectedCaptures) === 4 ? 'cedula_y_papeleta_4_caras' : 'documento_simple';
+
+        $this->syncMemberDataFromExtraction($opening, $slug, $extracted);
+
+        $document = $this->persistRequirementDocument(
+            $opening,
+            $requirement,
+            $path,
+            $fileName,
+            'application/pdf',
+            Storage::size($path),
+            'cargado',
+            $extracted
+        );
+
+        $this->audit($opening, 'escanear_requisito', "Documento escaneado: {$requirement->label}.");
+
+        return response()->json([
+            'message' => 'Documento escaneado correctamente. Validación ejecutada.',
+            'document_id' => $document->id,
+            'file_path' => $path,
+            'captures' => $storedCaptures,
+            'extracted_data' => $extracted,
+            'redirect' => route('accounts.show', [$opening, 'paso' => 'requisitos']),
+        ]);
     }
 
     public function extractRequirementData(AccountOpening $opening, UploadedDocument $document)
@@ -355,7 +521,7 @@ class AccountOpeningController extends Controller
     {
         if (!$this->consentIsValid($opening)) {
             return redirect()
-                ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
+                ->route('accounts.show', [$opening, 'paso' => 'requisitos'])
                 ->withErrors('Debe cargar y validar el consentimiento firmado antes de continuar.');
         }
 
@@ -642,7 +808,7 @@ class AccountOpeningController extends Controller
     {
         if (!$this->consentIsValid($opening)) {
             return redirect()
-                ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
+                ->route('accounts.show', [$opening, 'paso' => 'requisitos'])
                 ->withErrors('Debe cargar y validar el consentimiento firmado antes de continuar.');
         }
 
@@ -720,6 +886,101 @@ class AccountOpeningController extends Controller
             ->with('success', 'Documento interno guardado.');
     }
 
+    public function uploadScannedInternalDocument(Request $request, AccountOpening $opening)
+    {
+        if (!$this->consentIsValid($opening)) {
+            return response()->json([
+                'message' => 'Debe cargar y validar el consentimiento firmado antes de continuar.',
+            ], 422);
+        }
+
+        if (!$this->externalChecksAreComplete($opening)) {
+            return response()->json([
+                'message' => 'Complete las capturas obligatorias de consultas externas antes de documentos internos.',
+            ], 422);
+        }
+
+        if (!$opening->file_name_confirmed) {
+            return response()->json([
+                'message' => 'Asigne el nombre definitivo del expediente antes de cargar documentos internos.',
+            ], 422);
+        }
+
+        $data = $request->validate([
+            'internal_document_template_id' => ['required', 'exists:internal_document_templates,id'],
+            'captures' => ['required', 'array'],
+            'captures.*.key' => ['required', 'string', 'max:80'],
+            'captures.*.title' => ['required', 'string', 'max:120'],
+            'captures.*.image' => ['required', 'string'],
+            'manual_signature_confirmed' => ['nullable'],
+            'status' => ['nullable', Rule::in(['cargado', 'validado', 'rechazado'])],
+        ]);
+
+        $template = $this->internalTemplatesForOpening($opening)
+            ->where('id', $data['internal_document_template_id'])
+            ->firstOrFail();
+
+        if ($template->requires_signature && !$request->boolean('manual_signature_confirmed')) {
+            return response()->json([
+                'message' => "Debe confirmar que {$template->name} contiene firma.",
+            ], 422);
+        }
+
+        $scanned = $this->storeScannedDocumentPdf(
+            $opening,
+            $data['captures'],
+            $template->file_name_pattern ?: $template->name.'_{expediente}',
+            'interno_'.$template->slug
+        );
+
+        if ($template->requires_signature) {
+            [$scannedFile, $tempPath] = $this->temporaryUploadedFileFromStorage($scanned['path'], $scanned['file_name']);
+            $signatureError = app(SignatureValidationService::class)->validationError(
+                $scannedFile,
+                $template->template_path
+            );
+            @unlink($tempPath);
+
+            if ($signatureError) {
+                return response()->json(['message' => $signatureError], 422);
+            }
+        }
+
+        $document = UploadedDocument::updateOrCreate(
+            [
+                'account_opening_id' => $opening->id,
+                'internal_document_template_id' => $template->id,
+                'document_scope' => 'interno',
+            ],
+            [
+                'display_name' => $template->name,
+                'file_path' => $scanned['path'],
+                'original_name' => $scanned['file_name'],
+                'mime_type' => 'application/pdf',
+                'file_size' => $scanned['size'],
+                'status' => $data['status'] ?? 'cargado',
+                'extracted_data' => [
+                    'capturas_escaneadas' => $scanned['captures'],
+                    'flujo_escaneo' => 'documento_simple',
+                ],
+                'manual_signature_confirmed' => !$template->requires_signature || $request->boolean('manual_signature_confirmed'),
+                'uploaded_by' => auth()->id(),
+            ]
+        );
+
+        $this->audit($opening, 'escanear_documento_interno', "Documento interno escaneado: {$template->name}.");
+
+        $nextStep = $this->internalDocumentsAreComplete($opening) ? 'servicios' : 'internos';
+
+        return response()->json([
+            'message' => 'Documento interno escaneado correctamente.',
+            'document_id' => $document->id,
+            'file_path' => $scanned['path'],
+            'captures' => $scanned['captures'],
+            'redirect' => route('accounts.show', [$opening, 'paso' => $nextStep]),
+        ]);
+    }
+
     public function saveServices(Request $request, AccountOpening $opening)
     {
         if (!$opening->file_name_confirmed) {
@@ -729,7 +990,7 @@ class AccountOpeningController extends Controller
         }
         if (!$this->consentIsValid($opening)) {
             return redirect()
-                ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
+                ->route('accounts.show', [$opening, 'paso' => 'requisitos'])
                 ->withErrors('Debe cargar y validar el consentimiento firmado antes de continuar.');
         }
 
@@ -801,6 +1062,16 @@ class AccountOpeningController extends Controller
                 ->withErrors('El formato de este servicio aún está pendiente de incorporar.');
         }
 
+        $certificateProfile = null;
+        if ($this->isContributionCertificateTemplate($template)) {
+            $certificateProfile = $this->contributionCertificateProfile($opening);
+            if (blank($certificateProfile['original_path'] ?? null)) {
+                return redirect()
+                    ->route('accounts.show', [$opening, 'paso' => 'servicios'])
+                    ->withErrors("El certificado de aportación para {$this->agencyDocumentPlace($opening)} está pendiente de incorporar.");
+            }
+        }
+
         $data = array_merge(
             $request->query('modo') === 'vacio'
                 ? $this->blankPersonalDocumentDefaults($opening)
@@ -815,6 +1086,10 @@ class AccountOpeningController extends Controller
             'mes',
             'anio',
         ]));
+
+        if ($certificateProfile) {
+            $data['certificate_profile'] = $certificateProfile;
+        }
 
         return view('accounts.generated-documents.show', [
             'opening' => $opening->fresh('accountType'),
@@ -836,11 +1111,16 @@ class AccountOpeningController extends Controller
             ->where('id', $template->id)
             ->firstOrFail();
 
-        abort_unless($template->template_path && is_file(public_path($template->template_path)), 404);
+        $templatePath = $template->template_path;
+        if ($this->isContributionCertificateTemplate($template)) {
+            $templatePath = $this->contributionCertificateProfile($opening)['original_path'] ?? null;
+        }
 
-        return response()->file(public_path($template->template_path), [
+        abort_unless($templatePath && is_file(public_path($templatePath)), 404);
+
+        return response()->file(public_path($templatePath), [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="'.basename($template->template_path).'"',
+            'Content-Disposition' => 'inline; filename="'.basename($templatePath).'"',
         ]);
     }
 
@@ -853,7 +1133,7 @@ class AccountOpeningController extends Controller
         }
         if (!$this->consentIsValid($opening)) {
             return redirect()
-                ->route('accounts.show', [$opening, 'paso' => 'consentimiento'])
+                ->route('accounts.show', [$opening, 'paso' => 'requisitos'])
                 ->withErrors('Debe cargar y validar el consentimiento firmado antes de continuar.');
         }
 
@@ -924,6 +1204,102 @@ class AccountOpeningController extends Controller
         return redirect()
             ->route('accounts.show', [$opening, 'paso' => $nextStep])
             ->with('success', 'Documento de servicio guardado.');
+    }
+
+    public function uploadScannedServiceDocument(Request $request, AccountOpening $opening)
+    {
+        if (!$opening->file_name_confirmed) {
+            return response()->json([
+                'message' => 'Asigne el nombre definitivo del expediente antes de cargar documentos de servicios.',
+            ], 422);
+        }
+
+        if (!$this->consentIsValid($opening)) {
+            return response()->json([
+                'message' => 'Debe cargar y validar el consentimiento firmado antes de continuar.',
+            ], 422);
+        }
+
+        if (!$this->servicesStepIsComplete($opening)) {
+            return response()->json([
+                'message' => 'Guarde primero los servicios seleccionados.',
+            ], 422);
+        }
+
+        $data = $request->validate([
+            'internal_document_template_id' => ['required', 'exists:internal_document_templates,id'],
+            'captures' => ['required', 'array'],
+            'captures.*.key' => ['required', 'string', 'max:80'],
+            'captures.*.title' => ['required', 'string', 'max:120'],
+            'captures.*.image' => ['required', 'string'],
+            'manual_signature_confirmed' => ['nullable'],
+            'status' => ['nullable', Rule::in(['cargado', 'validado', 'rechazado'])],
+        ]);
+
+        $template = $this->serviceDocumentTemplates()
+            ->whereIn('slug', $this->requiredServiceTemplateSlugs($opening))
+            ->where('id', $data['internal_document_template_id'])
+            ->firstOrFail();
+
+        if ($template->requires_signature && !$request->boolean('manual_signature_confirmed')) {
+            return response()->json([
+                'message' => "Debe confirmar que {$template->name} contiene firma.",
+            ], 422);
+        }
+
+        $scanned = $this->storeScannedDocumentPdf(
+            $opening,
+            $data['captures'],
+            $template->file_name_pattern ?: $template->name.'_{expediente}',
+            'servicio_'.$template->slug
+        );
+
+        if ($template->requires_signature) {
+            [$scannedFile, $tempPath] = $this->temporaryUploadedFileFromStorage($scanned['path'], $scanned['file_name']);
+            $signatureError = app(SignatureValidationService::class)->validationError(
+                $scannedFile,
+                $template->template_path
+            );
+            @unlink($tempPath);
+
+            if ($signatureError) {
+                return response()->json(['message' => $signatureError], 422);
+            }
+        }
+
+        $document = UploadedDocument::updateOrCreate(
+            [
+                'account_opening_id' => $opening->id,
+                'internal_document_template_id' => $template->id,
+                'document_scope' => 'servicio',
+            ],
+            [
+                'display_name' => $template->name,
+                'file_path' => $scanned['path'],
+                'original_name' => $scanned['file_name'],
+                'mime_type' => 'application/pdf',
+                'file_size' => $scanned['size'],
+                'status' => $data['status'] ?? 'cargado',
+                'extracted_data' => [
+                    'capturas_escaneadas' => $scanned['captures'],
+                    'flujo_escaneo' => 'documento_simple',
+                ],
+                'manual_signature_confirmed' => !$template->requires_signature || $request->boolean('manual_signature_confirmed'),
+                'uploaded_by' => auth()->id(),
+            ]
+        );
+
+        $this->audit($opening, 'escanear_documento_servicio', "Documento de servicio escaneado: {$template->name}.");
+
+        $nextStep = $this->serviceDocumentsAreComplete($opening) ? 'resumen' : 'servicios';
+
+        return response()->json([
+            'message' => 'Documento de servicio escaneado correctamente.',
+            'document_id' => $document->id,
+            'file_path' => $scanned['path'],
+            'captures' => $scanned['captures'],
+            'redirect' => route('accounts.show', [$opening, 'paso' => $nextStep]),
+        ]);
     }
 
     public function saveOperationalCheck(Request $request, AccountOpening $opening)
@@ -1001,6 +1377,167 @@ class AccountOpeningController extends Controller
         $fileName = $this->buildStoredFileName($opening, $pattern ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME), $extension);
 
         return $file->storeAs("aperturas/{$opening->storage_folder}", $fileName);
+    }
+
+    private function storeScannedDocumentPdf(
+        AccountOpening $opening,
+        array $capturePayloads,
+        ?string $pattern,
+        string $slug,
+        ?array $expectedCaptures = null
+    ): array {
+        $captures = collect($capturePayloads)->keyBy('key');
+        $expectedCaptures ??= $this->expectedScanCaptures($slug);
+        $missingCaptures = collect($expectedCaptures)->pluck('key')->diff($captures->keys());
+
+        if ($missingCaptures->isNotEmpty()) {
+            abort(422, 'Debe completar todas las capturas obligatorias para finalizar.');
+        }
+
+        $images = [];
+        $storedCaptures = [];
+
+        foreach ($expectedCaptures as $captureConfig) {
+            $capture = $captures->get($captureConfig['key']);
+            $jpeg = $this->decodeScannedJpeg((string) $capture['image']);
+            $captureName = Str::slug($slug.' '.$captureConfig['file_name']) ?: 'documento_escaneado';
+            $capturePath = "aperturas/{$opening->storage_folder}/{$captureName}.jpg";
+
+            Storage::put($capturePath, $jpeg);
+
+            $images[] = [
+                'title' => $captureConfig['title'],
+                'jpeg' => $jpeg,
+            ];
+            $storedCaptures[] = [
+                'key' => $captureConfig['key'],
+                'title' => $captureConfig['title'],
+                'path' => $capturePath,
+            ];
+        }
+
+        $fileName = $this->buildStoredFileName($opening, $pattern ?: 'Documento escaneado_{expediente}', 'pdf');
+        $path = "aperturas/{$opening->storage_folder}/{$fileName}";
+        Storage::put($path, $this->makePdfFromJpegs($images));
+
+        return [
+            'path' => $path,
+            'file_name' => $fileName,
+            'size' => Storage::size($path),
+            'captures' => $storedCaptures,
+        ];
+    }
+
+    private function temporaryUploadedFileFromStorage(string $path, string $fileName): array
+    {
+        if (!is_dir(storage_path('tmp'))) {
+            mkdir(storage_path('tmp'), 0775, true);
+        }
+
+        $tempPath = tempnam(storage_path('tmp'), 'scan_');
+        if ($tempPath === false) {
+            abort(500, 'No se pudo preparar el archivo escaneado para validación.');
+        }
+
+        file_put_contents($tempPath, Storage::get($path));
+
+        return [
+            new UploadedFile($tempPath, $fileName, 'application/pdf', null, true),
+            $tempPath,
+        ];
+    }
+
+    private function persistRequirementDocument(
+        AccountOpening $opening,
+        AccountTypeRequirement $requirement,
+        string $path,
+        string $originalName,
+        string $mimeType,
+        int $fileSize,
+        string $status,
+        array $extracted
+    ): UploadedDocument {
+        return UploadedDocument::updateOrCreate(
+            [
+                'account_opening_id' => $opening->id,
+                'account_type_requirement_id' => $requirement->id,
+                'document_scope' => 'requisito',
+            ],
+            [
+                'display_name' => $requirement->label,
+                'file_path' => $path,
+                'original_name' => $originalName,
+                'mime_type' => $mimeType,
+                'file_size' => $fileSize,
+                'status' => $status,
+                'extracted_data' => $extracted,
+                'uploaded_by' => auth()->id(),
+            ]
+        );
+    }
+
+    private function expectedScanCaptures(string $slug): array
+    {
+        if (in_array($slug, ['cedula', 'cedula-papeleta'], true)) {
+            return [
+                [
+                    'key' => 'cedula_frontal',
+                    'title' => 'Cédula - lado frontal',
+                    'file_name' => 'cedula_frontal',
+                    'instruction' => 'Coloque el lado frontal de la cédula y presione Escanear.',
+                ],
+                [
+                    'key' => 'cedula_posterior',
+                    'title' => 'Cédula - lado posterior',
+                    'file_name' => 'cedula_posterior',
+                    'instruction' => 'Coloque el lado posterior de la cédula y presione Continuar.',
+                ],
+                [
+                    'key' => 'papeleta_votacion_frontal',
+                    'title' => 'Certificado de votación - lado frontal',
+                    'file_name' => 'papeleta_votacion_frontal',
+                    'instruction' => 'Coloque el lado frontal del certificado de votación y presione Continuar.',
+                ],
+                [
+                    'key' => 'papeleta_votacion_posterior',
+                    'title' => 'Certificado de votación - lado posterior',
+                    'file_name' => 'papeleta_votacion_posterior',
+                    'instruction' => 'Coloque el lado posterior del certificado de votación y presione Finalizar.',
+                ],
+            ];
+        }
+
+        return [
+            [
+                'key' => 'documento',
+                'title' => 'Documento escaneado',
+                'file_name' => Str::slug("documento {$slug}") ?: 'documento_escaneado',
+                'instruction' => 'Coloque el documento en el escáner y presione Escanear.',
+            ],
+        ];
+    }
+
+    private function decodeScannedJpeg(string $dataUrl): string
+    {
+        if (!preg_match('/^data:image\/(?:jpeg|jpg);base64,([A-Za-z0-9+\/=]+)$/', $dataUrl, $matches)) {
+            abort(422, 'El servicio local debe devolver una imagen JPG en base64.');
+        }
+
+        $binary = base64_decode($matches[1], true);
+
+        if ($binary === false || strlen($binary) < 1000) {
+            abort(422, 'La imagen escaneada está vacía o ilegible.');
+        }
+
+        if (strlen($binary) > self::MAX_FILE_KB * 1024) {
+            abort(422, 'Cada captura escaneada no debe superar 5 MB.');
+        }
+
+        if (!getimagesizefromstring($binary)) {
+            abort(422, 'No se pudo leer la imagen escaneada.');
+        }
+
+        return $binary;
     }
 
     private function storePastedImageAsPdf(string $dataUrl, AccountOpening $opening, string $step, ?string $pattern = null): string
@@ -1114,7 +1651,7 @@ class AccountOpeningController extends Controller
             'codigo_socio' => $opening->file_name,
             'cuenta_numero' => $opening->file_name,
             'tipo_cuenta' => $opening->accountType->name,
-            'ciudad' => 'Las Naves',
+            'ciudad' => $this->agencyDocumentPlace($opening),
             'dia' => now()->format('d'),
             'mes' => now()->locale('es')->translatedFormat('F'),
             'anio' => now()->format('Y'),
@@ -1135,7 +1672,7 @@ class AccountOpeningController extends Controller
             'codigo_socio' => $opening->file_name,
             'cuenta_numero' => $opening->file_name,
             'tipo_cuenta' => $opening->accountType->name,
-            'ciudad' => 'Las Naves',
+            'ciudad' => $this->agencyDocumentPlace($opening),
             'dia' => now()->format('d'),
             'mes' => now()->locale('es')->translatedFormat('F'),
             'anio' => now()->format('Y'),
@@ -1231,6 +1768,24 @@ class AccountOpeningController extends Controller
         return str_contains(strtolower($template->slug), 'registro-de-firmas');
     }
 
+    private function isContributionCertificateTemplate(InternalDocumentTemplate $template): bool
+    {
+        return str_contains(strtolower($template->slug), 'certificado-de-aportacion');
+    }
+
+    private function agencyDocumentPlace(AccountOpening $opening): string
+    {
+        return config(
+            "opening.agencies.{$opening->agency}.document_place",
+            config("opening.agencies.{$opening->agency}.name", $opening->agency ?: 'Las Naves')
+        );
+    }
+
+    private function contributionCertificateProfile(AccountOpening $opening): array
+    {
+        return config("opening.agencies.{$opening->agency}.contribution_certificate", []);
+    }
+
     private function consentDocumentDefaults(AccountOpening $opening): array
     {
         $opening->loadMissing('accountType');
@@ -1238,13 +1793,23 @@ class AccountOpeningController extends Controller
         $identification = preg_replace('/\D+/', '', (string) $opening->member_identification);
 
         return [
+            'tipo_persona' => $opening->accountType?->slug === 'cuenta-juridica' ? 'juridica' : 'natural',
             'apellidos_nombres' => $fullName,
             'cedula_identidad' => strlen($identification) === 10 ? $identification : '',
-            'ciudad' => 'Las Naves',
+            'razon_social' => '',
+            'ruc' => '',
+            'representante_legal' => $opening->accountType?->slug === 'cuenta-juridica' ? $fullName : '',
+            'cedula_representante' => $opening->accountType?->slug === 'cuenta-juridica' && strlen($identification) === 10 ? $identification : '',
+            'ciudad' => $this->agencyDocumentPlace($opening),
             'dia' => now()->format('d'),
             'mes' => now()->locale('es')->translatedFormat('F'),
             'anio' => now()->format('Y'),
             'tipo_cuenta' => $opening->accountType->name,
+            'correo' => '',
+            'celular' => '',
+            'correo_juridico' => '',
+            'celular_juridico' => '',
+            'direccion' => $opening->member_address ?: '',
         ];
     }
 
@@ -1894,9 +2459,11 @@ class AccountOpeningController extends Controller
 
     private function workflowState(AccountOpening $opening): array
     {
+        $consentComplete = $this->consentIsValid($opening);
+        $requirementsComplete = $this->requiredDocumentsAreValid($opening);
+
         $complete = [
-            'consentimiento' => $this->consentIsValid($opening),
-            'requisitos' => $this->requiredDocumentsAreValid($opening),
+            'requisitos' => $requirementsComplete && $consentComplete,
             'externas' => $this->externalChecksAreComplete($opening),
             'expediente' => $opening->file_name_confirmed,
             'internos' => $this->internalDocumentsAreComplete($opening),
@@ -1905,8 +2472,7 @@ class AccountOpeningController extends Controller
         ];
 
         $unlocked = [
-            'consentimiento' => true,
-            'requisitos' => $complete['consentimiento'],
+            'requisitos' => true,
             'externas' => $complete['requisitos'],
             'expediente' => $complete['externas'],
             'internos' => $complete['expediente'],
@@ -1936,8 +2502,7 @@ class AccountOpeningController extends Controller
     private function calculateProgress(AccountOpening $opening): int
     {
         $checks = [
-            $this->consentIsValid($opening),
-            $this->requiredDocumentsAreValid($opening),
+            $this->consentIsValid($opening) && $this->requiredDocumentsAreValid($opening),
             $this->externalChecksAreComplete($opening),
             $opening->file_name_confirmed,
             $this->internalDocumentsAreComplete($opening),

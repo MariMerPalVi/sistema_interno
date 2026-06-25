@@ -1,3 +1,23 @@
+@php
+    $personType = ($fields['tipo_persona'] ?? 'natural') === 'juridica' ? 'juridica' : 'natural';
+    $dateText = ($fields['dia'] ?? now()->format('d')) . '/' . ($fields['mes'] ?? now()->locale('es')->translatedFormat('F')) . '/' . ($fields['anio'] ?? now()->format('Y'));
+    $natural = [
+        'nombre' => $personType === 'natural' ? ($fields['apellidos_nombres'] ?? '') : '',
+        'cedula' => $personType === 'natural' ? ($fields['cedula_identidad'] ?? '') : '',
+        'correo' => $personType === 'natural' ? ($fields['correo'] ?? '') : '',
+        'telefono' => $personType === 'natural' ? ($fields['celular'] ?? '') : '',
+        'fecha' => $personType === 'natural' ? $dateText : '',
+    ];
+    $juridica = [
+        'razon_social' => $personType === 'juridica' ? ($fields['razon_social'] ?? '') : '',
+        'ruc' => $personType === 'juridica' ? ($fields['ruc'] ?? '') : '',
+        'representante' => $personType === 'juridica' ? ($fields['representante_legal'] ?? '') : '',
+        'cedula_representante' => $personType === 'juridica' ? ($fields['cedula_representante'] ?? '') : '',
+        'correo' => $personType === 'juridica' ? ($fields['correo_juridico'] ?? '') : '',
+        'telefono' => $personType === 'juridica' ? ($fields['celular_juridico'] ?? '') : '',
+        'fecha' => $personType === 'juridica' ? $dateText : '',
+    ];
+@endphp
 <!doctype html>
 <html lang="es">
 <head>
@@ -456,30 +476,30 @@
                 <div class="section-title">Para personas naturales:</div>
                 <div class="two-columns">
                     <div class="data-lines">
-                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $fields['apellidos_nombres'] ?? '' }}</span><span class="line-label">Nombre del Titular:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $fields['cedula_identidad'] ?? '' }}</span><span class="line-label">Cédula de identidad:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Correo electrónico:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Teléfono:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $natural['nombre'] }}</span><span class="line-label">Nombre del Titular:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $natural['cedula'] }}</span><span class="line-label">Cédula de identidad:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $natural['correo'] }}</span><span class="line-label">Correo electrónico:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $natural['telefono'] }}</span><span class="line-label">Teléfono:</span></div>
                     </div>
                     <div class="data-lines">
                         <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Firma:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true">{{ ($fields['dia'] ?? now()->format('d')) . '/' . ($fields['mes'] ?? now()->locale('es')->translatedFormat('F')) . '/' . ($fields['anio'] ?? now()->format('Y')) }}</span><span class="line-label">Fecha:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $natural['fecha'] }}</span><span class="line-label">Fecha:</span></div>
                     </div>
                 </div>
 
                 <div class="section-title">Para personas jurídicas:</div>
                 <div class="two-columns">
                     <div class="data-lines">
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Razón social:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">RUC:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Nombre del representante legal:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Cédula del representante legal:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Correo electrónico:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Teléfono:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $juridica['razon_social'] }}</span><span class="line-label">Razón social:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $juridica['ruc'] }}</span><span class="line-label">RUC:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $juridica['representante'] }}</span><span class="line-label">Nombre del representante legal:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $juridica['cedula_representante'] }}</span><span class="line-label">Cédula del representante legal:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $juridica['correo'] }}</span><span class="line-label">Correo electrónico:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $juridica['telefono'] }}</span><span class="line-label">Teléfono:</span></div>
                     </div>
                     <div class="data-lines">
                         <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Firma del representante legal:</span></div>
-                        <div class="data-line"><span class="line editable" contenteditable="true"></span><span class="line-label">Fecha:</span></div>
+                        <div class="data-line"><span class="line editable" contenteditable="true">{{ $juridica['fecha'] }}</span><span class="line-label">Fecha:</span></div>
                     </div>
                 </div>
 

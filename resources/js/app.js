@@ -22,6 +22,7 @@ import {
   Sparkles,
   Upload,
   UserRoundCheck,
+  X,
 } from 'lucide';
 
 createIcons({
@@ -47,7 +48,53 @@ createIcons({
     Sparkles,
     Upload,
     UserRoundCheck,
+    X,
   },
+});
+
+document.querySelectorAll('[data-open-dialog]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const dialog = document.getElementById(button.dataset.openDialog || '');
+    if (dialog instanceof HTMLDialogElement) {
+      dialog.showModal();
+    }
+  });
+});
+
+document.querySelectorAll('[data-close-dialog]').forEach((button) => {
+  button.addEventListener('click', () => {
+    button.closest('dialog')?.close();
+  });
+});
+
+document.querySelectorAll('dialog').forEach((dialog) => {
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) {
+      dialog.close();
+    }
+  });
+});
+
+document.querySelectorAll('[data-person-type-choice]').forEach((choice) => {
+  const form = choice.closest('form');
+  if (!form) return;
+
+  const radios = Array.from(choice.querySelectorAll('input[name="tipo_persona"]'));
+  const panels = Array.from(form.querySelectorAll('[data-person-type-panel]'));
+
+  const syncPanels = () => {
+    const selected = radios.find((radio) => radio.checked)?.value || 'natural';
+    panels.forEach((panel) => {
+      const active = panel.dataset.personTypePanel === selected;
+      panel.hidden = !active;
+      panel.querySelectorAll('input, select, textarea').forEach((control) => {
+        control.disabled = !active;
+      });
+    });
+  };
+
+  radios.forEach((radio) => radio.addEventListener('change', syncPanels));
+  syncPanels();
 });
 
 document.querySelectorAll('input[type="file"]').forEach((input) => {
@@ -140,6 +187,309 @@ document.querySelectorAll('.paste-capture').forEach((zone) => {
     reader.readAsDataURL(file);
   });
 });
+
+const identityScanSteps = [
+  {
+    key: 'cedula_frontal',
+    title: 'Cédula - lado frontal',
+    instruction: 'Coloque el lado frontal de la cédula y presione Escanear.',
+  },
+  {
+    key: 'cedula_posterior',
+    title: 'Cédula - lado posterior',
+    instruction: 'Coloque el lado posterior de la cédula y presione Continuar.',
+  },
+  {
+    key: 'papeleta_votacion_frontal',
+    title: 'Certificado de votación - lado frontal',
+    instruction: 'Coloque el lado frontal del certificado de votación y presione Continuar.',
+  },
+  {
+    key: 'papeleta_votacion_posterior',
+    title: 'Certificado de votación - lado posterior',
+    instruction: 'Coloque el lado posterior del certificado de votación y presione Finalizar.',
+  },
+];
+
+const singleScanSteps = [
+  {
+    key: 'documento',
+    title: 'Documento escaneado',
+    instruction: 'Coloque el documento en el escáner y presione Escanear.',
+  },
+];
+
+const scannerDialog = document.getElementById('scanner-dialog');
+
+if (scannerDialog instanceof HTMLDialogElement) {
+  const title = scannerDialog.querySelector('#scanner-dialog-title');
+  const stepCounter = scannerDialog.querySelector('[data-scanner-step-counter]');
+  const status = scannerDialog.querySelector('[data-scanner-status]');
+  const instruction = scannerDialog.querySelector('[data-scanner-instruction]');
+  const errorBox = scannerDialog.querySelector('[data-scanner-error]');
+  const previews = scannerDialog.querySelector('[data-scanner-previews]');
+  const nextButton = scannerDialog.querySelector('[data-scanner-next]');
+  const cancelButton = scannerDialog.querySelector('[data-scanner-cancel]');
+  const closeButton = scannerDialog.querySelector('[data-scanner-close]');
+
+  let scanState = null;
+
+  const csrfToken = () => document.querySelector('input[name="_token"]')?.value || '';
+
+  const showScannerError = (message) => {
+    if (!errorBox) return;
+    errorBox.hidden = false;
+    errorBox.textContent = message;
+  };
+
+  const clearScannerError = () => {
+    if (!errorBox) return;
+    errorBox.hidden = true;
+    errorBox.textContent = '';
+  };
+
+  const buttonLabel = () => {
+    if (!scanState) return 'Escanear';
+    if (scanState.currentIndex === 0) return 'Escanear';
+    return scanState.currentIndex === scanState.steps.length - 1 ? 'Finalizar' : 'Continuar';
+  };
+
+  const renderScanner = () => {
+    if (!scanState) return;
+
+    const currentStep = scanState.steps[scanState.currentIndex];
+    title.textContent = scanState.requirementLabel || 'Escanear documento';
+    stepCounter.textContent = `Paso ${scanState.currentIndex + 1} de ${scanState.steps.length}`;
+    status.textContent = scanState.busy ? 'Escaneando documento...' : currentStep.title;
+    instruction.textContent = currentStep.instruction;
+    nextButton.disabled = scanState.busy;
+    nextButton.innerHTML = scanState.busy
+      ? 'Escaneando...'
+      : `<i data-lucide="file-search"></i> ${buttonLabel()}`;
+
+    previews.innerHTML = scanState.steps.map((step, index) => {
+      const capture = scanState.captures[step.key];
+      return `
+        <article class="scanner-preview ${capture ? 'has-scan' : ''}">
+          <strong>${index + 1}. ${step.title}</strong>
+          ${capture ? `<img src="${capture.image}" alt="${step.title}">` : '<span>Pendiente</span>'}
+          ${capture ? `<button class="doc-action" type="button" data-repeat-scan="${index}" aria-label="Repetir ${step.title}" title="Repetir captura"><i data-lucide="refresh-cw"></i></button>` : ''}
+        </article>
+      `;
+    }).join('');
+
+    createIcons({
+      icons: {
+        ArrowRight,
+        Building2,
+        CheckCircle2,
+        ClipboardCheck,
+        ClipboardPaste,
+        Copy,
+        ExternalLink,
+        Eye,
+        FilePenLine,
+        FileSearch,
+        FileText,
+        FolderPlus,
+        KeyRound,
+        LogOut,
+        PencilLine,
+        RefreshCw,
+        Save,
+        ShieldCheck,
+        Sparkles,
+        Upload,
+        UserRoundCheck,
+        X,
+      },
+    });
+  };
+
+  const requestLocalScan = async (step) => {
+    if (!scanState.scannerUrl) {
+      throw new Error('No está configurada la URL del servicio local de escaneo.');
+    }
+
+    let response;
+    try {
+      response = await fetch(scanState.scannerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          key: step.key,
+          title: step.title,
+          instruction: step.instruction,
+        }),
+      });
+    } catch (error) {
+      throw new Error('No se pudo acceder al escáner. Verifique que el servicio local esté abierto.');
+    }
+
+    if (!response.ok) {
+      throw new Error('El servicio local de escaneo no respondió correctamente.');
+    }
+
+    const payload = await response.json();
+    const image = payload.image || payload.imageData || payload.dataUrl;
+
+    if (!image || !/^data:image\/jpe?g;base64,/i.test(image)) {
+      throw new Error('La imagen escaneada está vacía o no es JPG.');
+    }
+
+    return image;
+  };
+
+  const submitScannedDocument = async () => {
+    if (scanState.requiresSignature && scanState.signatureCheckbox && !scanState.signatureCheckbox.checked) {
+      showScannerError('Marque "Firma validada" antes de finalizar el escaneo de este documento.');
+      return;
+    }
+
+    const missing = scanState.steps.filter((step) => !scanState.captures[step.key]);
+    if (missing.length) {
+      showScannerError(scanState.steps.length === 4
+        ? 'Debe completar las cuatro capturas para finalizar.'
+        : 'Debe completar la captura para finalizar.');
+      return;
+    }
+
+    clearScannerError();
+    scanState.busy = true;
+    status.textContent = 'Validando documento...';
+    nextButton.disabled = true;
+
+    const dynamicPayload = {
+      ...(scanState.payload || {}),
+      ...(scanState.signatureCheckbox ? { manual_signature_confirmed: scanState.signatureCheckbox.checked ? '1' : '' } : {}),
+      ...(scanState.statusSelect ? { status: scanState.statusSelect.value || 'cargado' } : {}),
+    };
+
+    const response = await fetch(scanState.uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-CSRF-TOKEN': csrfToken(),
+      },
+      body: JSON.stringify({
+        ...dynamicPayload,
+        captures: scanState.steps.map((step) => ({
+          key: step.key,
+          title: step.title,
+          image: scanState.captures[step.key].image,
+        })),
+      }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      scanState.busy = false;
+      renderScanner();
+      showScannerError(payload.message || 'No se pudo validar el documento.');
+      return;
+    }
+
+    status.textContent = payload.message || 'Documento escaneado correctamente.';
+    window.location.href = payload.redirect || window.location.href;
+  };
+
+  nextButton?.addEventListener('click', async () => {
+    if (!scanState || scanState.busy) return;
+
+    const currentStep = scanState.steps[scanState.currentIndex];
+    clearScannerError();
+    scanState.busy = true;
+    renderScanner();
+
+    try {
+      const image = await requestLocalScan(currentStep);
+      scanState.captures[currentStep.key] = { image };
+      scanState.busy = false;
+
+      if (scanState.currentIndex < scanState.steps.length - 1) {
+        scanState.currentIndex += 1;
+        renderScanner();
+        status.textContent = 'Documento escaneado correctamente.';
+        return;
+      }
+
+      renderScanner();
+      await submitScannedDocument();
+    } catch (error) {
+      scanState.busy = false;
+      renderScanner();
+      showScannerError(error.message || 'El escaneo fue cancelado.');
+    }
+  });
+
+  previews?.addEventListener('click', (event) => {
+    const repeatButton = event.target.closest('[data-repeat-scan]');
+    if (!repeatButton || !scanState) return;
+
+    scanState.currentIndex = Number(repeatButton.dataset.repeatScan || 0);
+    delete scanState.captures[scanState.steps[scanState.currentIndex].key];
+    clearScannerError();
+    renderScanner();
+  });
+
+  const closeScanner = () => {
+    scanState = null;
+    scannerDialog.close();
+  };
+
+  cancelButton?.addEventListener('click', closeScanner);
+  closeButton?.addEventListener('click', closeScanner);
+
+  const startScanner = (button, payload, steps = singleScanSteps) => {
+    const form = button.closest('form');
+    const signatureCheckbox = form?.querySelector('input[name="manual_signature_confirmed"]');
+    const statusSelect = form?.querySelector('select[name="status"]');
+
+    scanState = {
+      requirementLabel: button.dataset.documentLabel || button.dataset.requirementLabel || 'Escanear documento',
+      payload: { ...payload },
+      uploadUrl: button.dataset.scanUrl,
+      scannerUrl: button.dataset.scannerUrl,
+      requiresSignature: button.dataset.requiresSignature === '1',
+      signatureCheckbox,
+      statusSelect,
+      steps,
+      captures: {},
+      currentIndex: 0,
+      busy: false,
+    };
+
+    clearScannerError();
+    renderScanner();
+    scannerDialog.showModal();
+  };
+
+  document.querySelectorAll('[data-scan-requirement]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const slug = button.dataset.requirementSlug || '';
+      startScanner(
+        button,
+        { account_type_requirement_id: button.dataset.requirementId },
+        ['cedula', 'cedula-papeleta'].includes(slug) ? identityScanSteps : singleScanSteps,
+      );
+    });
+  });
+
+  document.querySelectorAll('[data-scan-document]').forEach((button) => {
+    button.addEventListener('click', () => {
+      startScanner(
+        button,
+        button.dataset.templateId ? { internal_document_template_id: button.dataset.templateId } : {},
+        singleScanSteps,
+      );
+    });
+  });
+}
 
 document.querySelectorAll('.external-evidence-form').forEach((form) => {
   const companyChoice = form.querySelector('input[name="company_check_applicable"]');
