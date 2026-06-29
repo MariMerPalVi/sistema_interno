@@ -61,6 +61,155 @@ class DocumentExtractionService
         };
     }
 
+    public function extractScannedCaptures(string $slug, array $captures, ?UploadedFile $consolidatedFile = null): array
+    {
+        $captureResults = [];
+
+        foreach ($captures as $capture) {
+            if (!($capture['file'] ?? null) instanceof UploadedFile) {
+                continue;
+            }
+
+            $result = $this->extract($slug, $capture['file'], true);
+            $result['_capture_key'] = $capture['key'] ?? 'documento';
+            $result['_capture_title'] = $capture['title'] ?? 'Documento escaneado';
+            $captureResults[] = $result;
+        }
+
+        $consolidated = $consolidatedFile instanceof UploadedFile
+            ? $this->extract($slug, $consolidatedFile, true)
+            : [];
+
+        $merged = match ($slug) {
+            'cedula', 'cedula-papeleta', 'cedula-menor' => $this->mergeScannedIdentityExtraction($captureResults, $consolidated),
+            'planilla-servicios' => $this->mergeScannedUtilityExtraction($captureResults, $consolidated),
+            default => $consolidated ?: ($captureResults[0] ?? [
+                'revision' => 'Documento escaneado. Validación documental pendiente.',
+                'requiere_validacion_manual' => true,
+            ]),
+        };
+
+        $merged['ocr_por_captura'] = array_map(fn (array $result) => [
+            'captura' => $result['_capture_key'] ?? null,
+            'titulo' => $result['_capture_title'] ?? null,
+            'cedula' => $result['cedula'] ?? null,
+            'nombres_apellidos' => $result['nombres_apellidos'] ?? null,
+            'direccion' => $result['direccion'] ?? null,
+            'fuente_usada' => $result['fuente_usada'] ?? null,
+            'confianza' => $result['confianza'] ?? null,
+            'requiere_revision_manual_datos' => $result['requiere_revision_manual_datos'] ?? null,
+        ], $captureResults);
+
+        $this->debugLog('OCR scanned captures merged', [
+            'slug' => $slug,
+            'resultado' => [
+                'cedula' => $merged['cedula'] ?? null,
+                'nombre' => $merged['nombres_apellidos'] ?? null,
+                'direccion' => $merged['direccion'] ?? null,
+                'fuente' => $merged['fuente_usada'] ?? null,
+                'confianza' => $merged['confianza'] ?? null,
+            ],
+            'capturas' => $merged['ocr_por_captura'],
+        ]);
+
+        return $merged;
+    }
+
+    private function mergeScannedIdentityExtraction(array $captureResults, array $consolidated): array
+    {
+        $results = array_values(array_filter([...$captureResults, $consolidated]));
+        $base = $consolidated ?: ($captureResults[0] ?? []);
+
+        $id = null;
+        foreach ($results as $result) {
+            $candidate = preg_replace('/\D+/', '', (string) ($result['cedula'] ?? ''));
+            if (strlen($candidate) === 10) {
+                $id = $candidate;
+                break;
+            }
+        }
+
+        $nameCandidates = [];
+        foreach ($results as $result) {
+            $fullName = $this->cleanPersonName($result['nombres_apellidos'] ?? null);
+            if (!$fullName) {
+                continue;
+            }
+
+            $source = $result['fuente_usada'] ?? 'revision_manual';
+            $captureKey = $result['_capture_key'] ?? 'consolidado';
+            $score = (int) ($result['confianza'] ?? 0);
+            $score += match ($source) {
+                'cedula' => 24,
+                'mrz' => 20,
+                'certificado_votacion' => 6,
+                default => 0,
+            };
+            $score += match ($captureKey) {
+                'cedula_frontal', 'cedula_menor_frontal' => 18,
+                'cedula_posterior', 'cedula_menor_posterior' => 16,
+                'papeleta_votacion_frontal', 'papeleta_votacion_posterior' => 2,
+                default => 8,
+            };
+
+            $nameCandidates[] = [
+                'score' => $score,
+                'result' => $result,
+                'full_name' => $fullName,
+            ];
+        }
+
+        usort($nameCandidates, fn (array $a, array $b) => $b['score'] <=> $a['score']);
+        $selectedName = $nameCandidates[0] ?? null;
+
+        if ($selectedName) {
+            $sourceResult = $selectedName['result'];
+            $base['nombres_apellidos'] = $selectedName['full_name'];
+            $base['nombres'] = $sourceResult['nombres'] ?? null;
+            $base['apellidos'] = $sourceResult['apellidos'] ?? null;
+            $base['fuente_usada'] = $sourceResult['fuente_usada'] ?? 'cedula';
+            $base['confianza'] = min(100, (int) ($sourceResult['confianza'] ?? 0));
+            $base['observacion_extraccion'] = $sourceResult['observacion_extraccion'] ?? null;
+            $base['requiere_revision_manual_datos'] = $base['confianza'] < self::ID_NAME_CONFIDENCE_MIN;
+        }
+
+        $base['cedula'] = $id;
+        $base['cedula_valida'] = $id !== null;
+        $base['tipo_documento_detectado'] = $base['tipo_documento_detectado'] ?? 'documento_escaneado';
+
+        if (blank($base['nombres_apellidos'] ?? null)) {
+            $base['fuente_usada'] = 'revision_manual';
+            $base['confianza'] = $base['confianza'] ?? 0;
+            $base['observacion_extraccion'] = 'No se reconocieron nombres y apellidos con confianza suficiente en las capturas escaneadas.';
+            $base['requiere_revision_manual_datos'] = true;
+        }
+
+        return $base;
+    }
+
+    private function mergeScannedUtilityExtraction(array $captureResults, array $consolidated): array
+    {
+        $base = $consolidated ?: ($captureResults[0] ?? []);
+        $candidates = [];
+
+        foreach ([...$captureResults, $consolidated] as $result) {
+            $address = $this->cleanExtractedText((string) ($result['direccion'] ?? ''));
+            if (!$address || !$this->isPlausibleAddressLine($address)) {
+                continue;
+            }
+
+            $candidates[$address] = max($candidates[$address] ?? 0, mb_strlen($address));
+        }
+
+        if ($candidates) {
+            arsort($candidates);
+            $base['direccion'] = array_key_first($candidates);
+            $base['requiere_validacion_manual'] = false;
+        }
+
+        return $base;
+    }
+
     private function extractText(UploadedFile $file, bool $forceOcr = false): string
     {
         $text = '';

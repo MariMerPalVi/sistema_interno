@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PersonalDataConsent extends Model
 {
@@ -23,4 +24,14 @@ class PersonalDataConsent extends Model
         'manual_signature_confirmed' => 'boolean',
         'validated_at' => 'datetime',
     ];
+
+    public function opening(): BelongsTo
+    {
+        return $this->belongsTo(AccountOpening::class, 'account_opening_id');
+    }
+
+    public function validator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'validated_by');
+    }
 }

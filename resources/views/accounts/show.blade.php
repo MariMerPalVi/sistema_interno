@@ -562,6 +562,8 @@
                                 data-template-id="{{ $template->id }}"
                                 data-document-label="{{ $template->name }}"
                                 data-requires-signature="{{ $template->requires_signature ? '1' : '0' }}"
+                                data-scan-mode="multi-page"
+                                data-max-pages="6"
                             >
                                 <i data-lucide="file-search"></i> Escanear
                             </button>
@@ -664,6 +666,8 @@
                                     data-template-id="{{ $template->id }}"
                                     data-document-label="{{ $template->name }}"
                                     data-requires-signature="{{ $template->requires_signature ? '1' : '0' }}"
+                                    data-scan-mode="multi-page"
+                                    data-max-pages="6"
                                 >
                                     <i data-lucide="file-search"></i> Escanear
                                 </button>
@@ -793,6 +797,7 @@
             <div class="dialog-actions scanner-actions">
                 <button class="button secondary" type="button" data-scanner-cancel>Cancelar</button>
                 <button class="button secondary" type="button" data-scanner-repeat hidden><i data-lucide="refresh-cw"></i> Repetir captura</button>
+                <button class="button primary" type="button" data-scanner-finish hidden><i data-lucide="file-text"></i> Generar PDF</button>
                 <button class="button primary" type="button" data-scanner-next><i data-lucide="file-search"></i> Escanear</button>
             </div>
         </form>

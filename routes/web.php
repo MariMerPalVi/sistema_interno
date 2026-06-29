@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountOpeningController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ConsentReviewController;
 use App\Http\Controllers\DataUpdateController;
 use App\Http\Controllers\ProcessController;
 use App\Http\Controllers\ProtectedAssetController;
@@ -17,6 +18,7 @@ Route::post('/salir', [AuthController::class, 'destroy'])->name('logout');
 Route::get('/mi-contrasena', [AuthController::class, 'editPassword'])->name('password.edit');
 Route::put('/mi-contrasena', [AuthController::class, 'updatePassword'])->name('password.update');
 Route::get('/', [ProcessController::class, 'index'])->name('processes.index');
+Route::get('/consentimientos', [ConsentReviewController::class, 'index'])->name('consents.index');
 Route::get('/recursos/firmas-certificado/{authority}', [ProtectedAssetController::class, 'certificateSignature'])
     ->whereIn('authority', ['presidente', 'gerente'])
     ->name('protected-assets.certificate-signature');

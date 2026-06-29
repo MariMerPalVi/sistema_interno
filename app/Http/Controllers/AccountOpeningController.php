@@ -246,7 +246,7 @@ class AccountOpeningController extends Controller
     public function uploadScannedConsent(Request $request, AccountOpening $opening)
     {
         $data = $request->validate([
-            'captures' => ['required', 'array'],
+            'captures' => ['required', 'array', 'min:1', 'max:4'],
             'captures.*.key' => ['required', 'string', 'max:80'],
             'captures.*.title' => ['required', 'string', 'max:120'],
             'captures.*.image' => ['required', 'string'],
@@ -375,7 +375,7 @@ class AccountOpeningController extends Controller
                 'required',
                 Rule::exists('account_type_requirements', 'id')->where('account_type_id', $opening->account_type_id),
             ],
-            'captures' => ['required', 'array'],
+            'captures' => ['required', 'array', 'min:1', 'max:4'],
             'captures.*.key' => ['required', 'string', 'max:80'],
             'captures.*.title' => ['required', 'string', 'max:120'],
             'captures.*.image' => ['required', 'string'],
@@ -418,7 +418,10 @@ class AccountOpeningController extends Controller
 
         $fileName = $this->buildStoredFileName($opening, $requirement->file_name_pattern ?: $requirement->label.'_{expediente}', 'pdf');
         $path = "aperturas/{$opening->storage_folder}/{$fileName}";
-        Storage::put($path, $this->makePdfFromJpegs($images));
+        $pdf = in_array($slug, ['cedula', 'cedula-papeleta'], true)
+            ? $this->makeIdentityScanPdfFromJpegs($images)
+            : $this->makePdfFromJpegs($images);
+        Storage::put($path, $pdf);
 
         if (!is_dir(storage_path('tmp'))) {
             mkdir(storage_path('tmp'), 0775, true);
@@ -433,16 +436,27 @@ class AccountOpeningController extends Controller
 
         file_put_contents($tempPath, Storage::get($path));
         $scannedFile = new UploadedFile($tempPath, $fileName, 'application/pdf', null, true);
+        [$captureFiles, $captureTempPaths] = $this->temporaryUploadedJpegFilesFromStoredCaptures($storedCaptures);
 
-        $extracted = app(DocumentExtractionService::class)->extract(
-            $slug,
-            $scannedFile,
-            in_array($slug, ['cedula', 'cedula-papeleta', 'planilla-servicios'], true)
-        );
-        @unlink($tempPath);
+        try {
+            $extracted = app(DocumentExtractionService::class)->extractScannedCaptures(
+                $slug,
+                $captureFiles,
+                $scannedFile
+            );
+        } finally {
+            @unlink($tempPath);
+            foreach ($captureTempPaths as $captureTempPath) {
+                @unlink($captureTempPath);
+            }
+        }
 
         $extracted['capturas_escaneadas'] = $storedCaptures;
-        $extracted['flujo_escaneo'] = count($expectedCaptures) === 4 ? 'cedula_y_papeleta_4_caras' : 'documento_simple';
+        $extracted['flujo_escaneo'] = match (count($expectedCaptures)) {
+            4 => 'cedula_y_papeleta_4_caras',
+            2 => 'cedula_menor_2_caras',
+            default => 'documento_simple',
+        };
 
         $this->syncMemberDataFromExtraction($opening, $slug, $extracted);
 
@@ -908,7 +922,7 @@ class AccountOpeningController extends Controller
 
         $data = $request->validate([
             'internal_document_template_id' => ['required', 'exists:internal_document_templates,id'],
-            'captures' => ['required', 'array'],
+            'captures' => ['required', 'array', 'min:1', 'max:6'],
             'captures.*.key' => ['required', 'string', 'max:80'],
             'captures.*.title' => ['required', 'string', 'max:120'],
             'captures.*.image' => ['required', 'string'],
@@ -930,7 +944,8 @@ class AccountOpeningController extends Controller
             $opening,
             $data['captures'],
             $template->file_name_pattern ?: $template->name.'_{expediente}',
-            'interno_'.$template->slug
+            'interno_'.$template->slug,
+            $this->expectedSequentialPageCaptures($template->name, count($data['captures']))
         );
 
         if ($template->requires_signature) {
@@ -1228,7 +1243,7 @@ class AccountOpeningController extends Controller
 
         $data = $request->validate([
             'internal_document_template_id' => ['required', 'exists:internal_document_templates,id'],
-            'captures' => ['required', 'array'],
+            'captures' => ['required', 'array', 'min:1', 'max:6'],
             'captures.*.key' => ['required', 'string', 'max:80'],
             'captures.*.title' => ['required', 'string', 'max:120'],
             'captures.*.image' => ['required', 'string'],
@@ -1251,7 +1266,8 @@ class AccountOpeningController extends Controller
             $opening,
             $data['captures'],
             $template->file_name_pattern ?: $template->name.'_{expediente}',
-            'servicio_'.$template->slug
+            'servicio_'.$template->slug,
+            $this->expectedSequentialPageCaptures($template->name, count($data['captures']))
         );
 
         if ($template->requires_signature) {
@@ -1447,6 +1463,41 @@ class AccountOpeningController extends Controller
         ];
     }
 
+    private function temporaryUploadedJpegFilesFromStoredCaptures(array $storedCaptures): array
+    {
+        if (!is_dir(storage_path('tmp'))) {
+            mkdir(storage_path('tmp'), 0775, true);
+        }
+
+        $files = [];
+        $tempPaths = [];
+
+        foreach ($storedCaptures as $capture) {
+            $sourcePath = $capture['path'] ?? null;
+            if (!$sourcePath || !Storage::exists($sourcePath)) {
+                continue;
+            }
+
+            $tempPath = storage_path('tmp/scan_capture_'.Str::uuid().'.jpg');
+            file_put_contents($tempPath, Storage::get($sourcePath));
+            $tempPaths[] = $tempPath;
+
+            $files[] = [
+                'key' => $capture['key'] ?? 'documento',
+                'title' => $capture['title'] ?? 'Documento escaneado',
+                'file' => new UploadedFile(
+                    $tempPath,
+                    basename($sourcePath),
+                    'image/jpeg',
+                    null,
+                    true
+                ),
+            ];
+        }
+
+        return [$files, $tempPaths];
+    }
+
     private function persistRequirementDocument(
         AccountOpening $opening,
         AccountTypeRequirement $requirement,
@@ -1507,6 +1558,23 @@ class AccountOpeningController extends Controller
             ];
         }
 
+        if ($slug === 'cedula-menor') {
+            return [
+                [
+                    'key' => 'cedula_menor_frontal',
+                    'title' => 'Cédula del menor - lado frontal',
+                    'file_name' => 'cedula_menor_frontal',
+                    'instruction' => 'Coloque el lado frontal de la cédula del menor y presione Escanear.',
+                ],
+                [
+                    'key' => 'cedula_menor_posterior',
+                    'title' => 'Cédula del menor - lado posterior',
+                    'file_name' => 'cedula_menor_posterior',
+                    'instruction' => 'Coloque el lado posterior de la cédula del menor y presione Finalizar.',
+                ],
+            ];
+        }
+
         return [
             [
                 'key' => 'documento',
@@ -1515,6 +1583,20 @@ class AccountOpeningController extends Controller
                 'instruction' => 'Coloque el documento en el escáner y presione Escanear.',
             ],
         ];
+    }
+
+    private function expectedSequentialPageCaptures(string $label, int $pageCount): array
+    {
+        $pageCount = max(1, min(6, $pageCount));
+
+        return collect(range(1, $pageCount))->map(fn (int $page) => [
+            'key' => "pagina_{$page}",
+            'title' => $pageCount === 1 ? 'Documento escaneado' : "Página {$page}",
+            'file_name' => "pagina_{$page}",
+            'instruction' => $page === 1
+                ? "Coloque la primera página de {$label} y presione Escanear."
+                : "Coloque la página {$page} de {$label} y presione Agregar página.",
+        ])->all();
     }
 
     private function decodeScannedJpeg(string $dataUrl): string
@@ -1946,6 +2028,98 @@ class AccountOpeningController extends Controller
         array_splice($objects, 1, 0, ["2 0 obj\n<< /Type /Pages /Kids [{$kids}] /Count ".count($pageObjectIds)." >>\nendobj\n"]);
 
         return $this->compilePdfObjects($objects);
+    }
+
+    private function makeIdentityScanPdfFromJpegs(array $images): string
+    {
+        if (count($images) !== 4) {
+            return $this->makePdfFromJpegs($images);
+        }
+
+        $pageWidth = 595.28;
+        $pageHeight = 841.89;
+        $marginX = 36;
+        $gapX = 18;
+        $gapY = 24;
+        $titleY = 792;
+        $slotWidth = ($pageWidth - ($marginX * 2) - $gapX) / 2;
+        $slotHeight = 310;
+
+        $xObjects = '';
+        $content = '';
+        $content .= "BT /F1 15 Tf 0 0 0 rg 142 {$titleY} Td (CEDULA Y CERTIFICADO DE VOTACION) Tj ET\n";
+        $content .= "q\n0.00 0.49 0.42 rg {$marginX} 778 523 2 re f\nQ\n";
+
+        $imageObjects = [];
+        $labels = [
+            '1. Cedula - lado frontal',
+            '2. Cedula - lado posterior',
+            '3. Certificado de votacion - lado frontal',
+            '4. Certificado de votacion - lado posterior',
+        ];
+
+        foreach (array_values($images) as $index => $image) {
+            $jpeg = $image['jpeg'];
+            $size = getimagesizefromstring($jpeg);
+            if (!$size) {
+                abort(422, 'No se pudo leer una de las capturas escaneadas.');
+            }
+
+            [$imageWidth, $imageHeight] = $size;
+            $imageObjectId = 5 + $index;
+            $xObjects .= "/Im{$imageObjectId} {$imageObjectId} 0 R ";
+
+            $column = $index % 2;
+            $row = intdiv($index, 2);
+            $slotX = $marginX + ($column * ($slotWidth + $gapX));
+            $slotY = 446 - ($row * ($slotHeight + $gapY));
+
+            $content .= "q\n0.96 0.98 0.99 rg {$slotX} {$slotY} {$slotWidth} {$slotHeight} re f\nQ\n";
+            $content .= "q\n0.75 0.84 0.88 RG 0.8 w {$slotX} {$slotY} {$slotWidth} {$slotHeight} re S\nQ\n";
+            $label = $this->pdfEscape($labels[$index]);
+            $content .= "BT /F1 9 Tf 0.02 0.19 0.31 rg ".($slotX + 10).' '.($slotY + $slotHeight - 18)." Td ({$label}) Tj ET\n";
+
+            $imageTopPadding = 34;
+            $imagePadding = 12;
+            $maxWidth = $slotWidth - ($imagePadding * 2);
+            $maxHeight = $slotHeight - $imageTopPadding - $imagePadding;
+            $scale = min($maxWidth / $imageWidth, $maxHeight / $imageHeight);
+            $drawWidth = round($imageWidth * $scale, 2);
+            $drawHeight = round($imageHeight * $scale, 2);
+            $x = round($slotX + (($slotWidth - $drawWidth) / 2), 2);
+            $y = round($slotY + $imagePadding + (($maxHeight - $drawHeight) / 2), 2);
+
+            $content .= "q\n{$drawWidth} 0 0 {$drawHeight} {$x} {$y} cm\n/Im{$imageObjectId} Do\nQ\n";
+
+            $imageObjects[] = "{$imageObjectId} 0 obj\n<< /Type /XObject /Subtype /Image /Width {$imageWidth} /Height {$imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ".strlen($jpeg)." >>\nstream\n{$jpeg}\nendstream\nendobj\n";
+        }
+
+        $contentObjectId = 9;
+        $pageObject = "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {$pageWidth} {$pageHeight}] /Resources << /Font << /F1 4 0 R >> /XObject << {$xObjects}>> >> /Contents {$contentObjectId} 0 R >>\nendobj\n";
+        $fontObject = "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n";
+        $contentObject = "{$contentObjectId} 0 obj\n<< /Length ".strlen($content)." >>\nstream\n{$content}endstream\nendobj\n";
+
+        $objects = [
+            "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+            "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+            $pageObject,
+            $fontObject,
+            ...$imageObjects,
+            $contentObject,
+        ];
+
+        return $this->compilePdfObjects($objects);
+    }
+
+    private function pdfEscape(string $value): string
+    {
+        $value = str_replace(
+            ['Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ', 'á', 'é', 'í', 'ó', 'ú', 'ñ'],
+            ['A', 'E', 'I', 'O', 'U', 'N', 'a', 'e', 'i', 'o', 'u', 'n'],
+            $value
+        );
+
+        return str_replace(['\\', '(', ')'], ['\\\\', '\(', '\)'], $value);
     }
 
     private function makePdfImagePageObjects(int $pageObjectId, string $jpeg, ?string $title): array

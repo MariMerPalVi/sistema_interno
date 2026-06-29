@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             ['name' => 'asesor', 'label' => 'Asesor'],
             ['name' => 'supervisor', 'label' => 'Supervisor'],
             ['name' => 'administrador', 'label' => 'Administrador'],
+            ['name' => 'abogada', 'label' => 'Abogada'],
             ['name' => 'jefe_captaciones', 'label' => 'Jefe de Captaciones'],
             ['name' => 'oficial_cumplimiento', 'label' => 'Oficial de Cumplimiento'],
         ])->map(fn ($role) => Role::updateOrCreate(['name' => $role['name']], $role));
@@ -32,6 +33,7 @@ class DatabaseSeeder extends Seeder
 
         foreach ([
             ['Administrador', ' ', 'administrador@cooperativa.local', 'administrador', 'matriz-las-naves'],
+            ['Abogada', 'abogada', 'abogada@cooperativa.local', 'abogada', 'matriz-las-naves'],
             ['Matriz - Las Naves', 'matriz', 'matriz@cooperativa.local', 'asesor', 'matriz-las-naves'],
             ['Echeandía', 'echeandia', 'echeandia@cooperativa.local', 'asesor', 'echeandia'],
             ['Caluma', 'caluma', 'caluma@cooperativa.local', 'asesor', 'caluma'],

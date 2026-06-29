@@ -211,6 +211,19 @@ const identityScanSteps = [
   },
 ];
 
+const minorIdScanSteps = [
+  {
+    key: 'cedula_menor_frontal',
+    title: 'Cédula del menor - lado frontal',
+    instruction: 'Coloque el lado frontal de la cédula del menor y presione Escanear.',
+  },
+  {
+    key: 'cedula_menor_posterior',
+    title: 'Cédula del menor - lado posterior',
+    instruction: 'Coloque el lado posterior de la cédula del menor y presione Finalizar.',
+  },
+];
+
 const singleScanSteps = [
   {
     key: 'documento',
@@ -218,6 +231,15 @@ const singleScanSteps = [
     instruction: 'Coloque el documento en el escáner y presione Escanear.',
   },
 ];
+
+const buildMultiPageScanSteps = (maxPages = 6) => Array.from({ length: Math.max(1, Math.min(maxPages, 6)) }, (_, index) => ({
+  key: `pagina_${index + 1}`,
+  title: `Página ${index + 1}`,
+  instruction: index === 0
+    ? 'Coloque la primera página del documento en el escáner y presione Escanear.'
+    : `Coloque la página ${index + 1} si aplica y presione Agregar página. También puede generar el PDF con las páginas ya escaneadas.`,
+  required: index === 0,
+}));
 
 const scannerDialog = document.getElementById('scanner-dialog');
 
@@ -229,6 +251,7 @@ if (scannerDialog instanceof HTMLDialogElement) {
   const errorBox = scannerDialog.querySelector('[data-scanner-error]');
   const previews = scannerDialog.querySelector('[data-scanner-previews]');
   const nextButton = scannerDialog.querySelector('[data-scanner-next]');
+  const finishButton = scannerDialog.querySelector('[data-scanner-finish]');
   const cancelButton = scannerDialog.querySelector('[data-scanner-cancel]');
   const closeButton = scannerDialog.querySelector('[data-scanner-close]');
 
@@ -250,8 +273,9 @@ if (scannerDialog instanceof HTMLDialogElement) {
 
   const buttonLabel = () => {
     if (!scanState) return 'Escanear';
-    if (scanState.readyToSubmit) return scanState.steps.length === 4 ? 'Generar PDF consolidado' : 'Generar PDF';
+    if (scanState.readyToSubmit) return scanState.steps.length > 1 ? 'Generar PDF consolidado' : 'Generar PDF';
     if (scanState.currentIndex === 0) return 'Escanear';
+    if (scanState.allowPartialSubmit) return 'Agregar página';
     return scanState.currentIndex === scanState.steps.length - 1 ? 'Finalizar' : 'Continuar';
   };
 
@@ -286,21 +310,26 @@ if (scannerDialog instanceof HTMLDialogElement) {
       ? 'Capturas listas para revisar'
       : (scanState.busy ? 'Escaneando documento...' : currentStep.title);
     instruction.textContent = scanState.readyToSubmit
-      ? (scanState.steps.length === 4
-        ? 'Revise las cuatro imágenes. Si están correctas, genere un solo PDF para cédula y papeleta.'
+      ? (scanState.steps.length > 1
+        ? 'Revise las capturas. Si están correctas, genere un solo PDF consolidado.'
         : 'Revise la imagen. Si está correcta, genere el PDF del documento.')
       : currentStep.instruction;
     nextButton.disabled = scanState.busy;
     nextButton.innerHTML = scanState.busy
       ? 'Escaneando...'
       : `<i data-lucide="file-search"></i> ${buttonLabel()}`;
+    if (finishButton) {
+      const canFinishPartial = scanState.allowPartialSubmit && Object.keys(scanState.captures).length > 0 && !scanState.readyToSubmit;
+      finishButton.hidden = !canFinishPartial;
+      finishButton.disabled = scanState.busy;
+    }
 
     previews.innerHTML = scanState.steps.map((step, index) => {
       const capture = scanState.captures[step.key];
       return `
         <article class="scanner-preview ${capture ? 'has-scan' : ''}">
           <strong>${index + 1}. ${step.title}</strong>
-          ${capture ? `<img src="${capture.previewUrl || capture.image}" alt="${step.title}" data-fallback-src="${capture.image}"><small>${formatBytes(capture.bytes)}</small>` : '<span>Pendiente</span>'}
+          ${capture ? `<img src="${capture.previewUrl || capture.image}" alt="${step.title}" data-fallback-src="${capture.image}"><small>${formatBytes(capture.bytes)}</small>` : `<span>${step.required === false ? 'Opcional' : 'Pendiente'}</span>`}
           ${capture ? `
             <div class="scanner-preview-actions">
               <a class="doc-action" href="${capture.previewUrl || capture.image}" target="_blank" rel="noopener" aria-label="Ver ${step.title}" title="Ver imagen"><i data-lucide="eye"></i></a>
@@ -357,6 +386,13 @@ if (scannerDialog instanceof HTMLDialogElement) {
           title: step.title,
           instruction: step.instruction,
           auto_crop: Boolean(scanState.autoCrop),
+          scan_profile: scanState.scanProfile,
+          fixed_scan_area: scanState.scanProfile === 'identity_92x165',
+          page_width_mm: scanState.scanProfile === 'identity_92x165' ? 92 : null,
+          page_height_mm: scanState.scanProfile === 'identity_92x165' ? 165 : null,
+          dpi: scanState.scanProfile === 'identity_92x165' ? 300 : null,
+          jpeg_quality: scanState.scanProfile === 'identity_92x165' ? 90 : null,
+          max_side: scanState.scanProfile === 'identity_92x165' ? 2400 : null,
         }),
       });
     } catch (error) {
@@ -389,10 +425,11 @@ if (scannerDialog instanceof HTMLDialogElement) {
       return;
     }
 
-    const missing = scanState.steps.filter((step) => !scanState.captures[step.key]);
+    const requiredSteps = scanState.steps.filter((step) => step.required !== false);
+    const missing = requiredSteps.filter((step) => !scanState.captures[step.key]);
     if (missing.length) {
-      showScannerError(scanState.steps.length === 4
-        ? 'Debe completar las cuatro capturas para finalizar.'
+      showScannerError(scanState.steps.length > 1
+        ? 'Debe completar las capturas obligatorias para finalizar.'
         : 'Debe completar la captura para finalizar.');
       return;
     }
@@ -417,7 +454,7 @@ if (scannerDialog instanceof HTMLDialogElement) {
       },
       body: JSON.stringify({
         ...dynamicPayload,
-        captures: scanState.steps.map((step) => ({
+        captures: scanState.steps.filter((step) => scanState.captures[step.key]).map((step) => ({
           key: step.key,
           title: step.title,
           image: scanState.captures[step.key].image,
@@ -473,6 +510,13 @@ if (scannerDialog instanceof HTMLDialogElement) {
     }
   });
 
+  finishButton?.addEventListener('click', async () => {
+    if (!scanState || scanState.busy) return;
+    scanState.readyToSubmit = true;
+    renderScanner();
+    await submitScannedDocument();
+  });
+
   previews?.addEventListener('click', (event) => {
     const repeatButton = event.target.closest('[data-repeat-scan]');
     if (!repeatButton || !scanState) return;
@@ -509,6 +553,7 @@ if (scannerDialog instanceof HTMLDialogElement) {
     const form = button.closest('form');
     const signatureCheckbox = form?.querySelector('input[name="manual_signature_confirmed"]');
     const statusSelect = form?.querySelector('select[name="status"]');
+    const isIdentityScan = steps === identityScanSteps || steps === minorIdScanSteps;
 
     scanState = {
       requirementLabel: button.dataset.documentLabel || button.dataset.requirementLabel || 'Escanear documento',
@@ -519,7 +564,9 @@ if (scannerDialog instanceof HTMLDialogElement) {
       signatureCheckbox,
       statusSelect,
       steps,
-      autoCrop: steps === identityScanSteps,
+      autoCrop: isIdentityScan,
+      scanProfile: isIdentityScan ? 'identity_92x165' : 'document',
+      allowPartialSubmit: button.dataset.scanMode === 'multi-page',
       captures: {},
       currentIndex: 0,
       busy: false,
@@ -537,17 +584,20 @@ if (scannerDialog instanceof HTMLDialogElement) {
       startScanner(
         button,
         { account_type_requirement_id: button.dataset.requirementId },
-        ['cedula', 'cedula-papeleta'].includes(slug) ? identityScanSteps : singleScanSteps,
+        ['cedula', 'cedula-papeleta'].includes(slug)
+          ? identityScanSteps
+          : (slug === 'cedula-menor' ? minorIdScanSteps : singleScanSteps),
       );
     });
   });
 
   document.querySelectorAll('[data-scan-document]').forEach((button) => {
     button.addEventListener('click', () => {
+      const maxPages = Number(button.dataset.maxPages || 6);
       startScanner(
         button,
         button.dataset.templateId ? { internal_document_template_id: button.dataset.templateId } : {},
-        singleScanSteps,
+        button.dataset.scanMode === 'multi-page' ? buildMultiPageScanSteps(maxPages) : singleScanSteps,
       );
     });
   });

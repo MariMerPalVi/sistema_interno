@@ -30,6 +30,11 @@ class User extends Authenticatable
         return $this->role?->name === 'administrador';
     }
 
+    public function canReviewConsents(): bool
+    {
+        return $this->role?->name === 'abogada';
+    }
+
     public function agencyName(): string
     {
         return config("opening.agencies.{$this->agency}.name", $this->agency);

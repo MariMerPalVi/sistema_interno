@@ -297,24 +297,125 @@ function Save-OptimizedJpeg {
     }
 }
 
-function Invoke-WiaScan {
+function Set-WiaPropertyValue {
     param(
-        [bool] $AutoCrop = $false
+        $Properties,
+        [int] $PropertyId,
+        $Value,
+        [string] $Label
     )
 
+    $property = $null
+
+    try {
+        foreach ($candidate in $Properties) {
+            if ($candidate.PropertyID -eq $PropertyId) {
+                $property = $candidate
+                break
+            }
+        }
+
+        if ($null -eq $property) {
+            throw "La propiedad no existe en este dispositivo."
+        }
+
+        $property.Value = $Value
+        Write-Log "WIA propiedad $Label ($PropertyId) = $Value"
+        return $true
+    } catch {
+        Write-Log "WIA no permite fijar $Label ($PropertyId): $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Get-DefaultScannerDevice {
+    $manager = New-Object -ComObject WIA.DeviceManager
+
+    foreach ($deviceInfo in $manager.DeviceInfos) {
+        if ($deviceInfo.Type -eq 1) {
+            return @{
+                manager = $manager
+                device = $deviceInfo.Connect()
+            }
+        }
+    }
+
+    if ([System.Runtime.InteropServices.Marshal]::IsComObject($manager)) {
+        [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($manager)
+    }
+
+    throw "No se encontró un escáner WIA instalado en este computador."
+}
+
+function Invoke-WiaFixedAreaScan {
+    param(
+        [int] $WidthMm = 92,
+        [int] $HeightMm = 165,
+        [int] $Dpi = 300
+    )
+
+    $jpegFormat = "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}"
+    $scanner = $null
+    $manager = $null
+    $device = $null
+    $item = $null
+    $image = $null
+
+    try {
+        $scanner = Get-DefaultScannerDevice
+        $manager = $scanner.manager
+        $device = $scanner.device
+        $item = $device.Items.Item(1)
+
+        $widthPixels = [Math]::Max(1, [int][Math]::Round(($WidthMm / 25.4) * $Dpi))
+        $heightPixels = [Math]::Max(1, [int][Math]::Round(($HeightMm / 25.4) * $Dpi))
+
+        Write-Log "Escaneo de identidad: area $WidthMm x $HeightMm mm, $Dpi DPI, $widthPixels x $heightPixels px."
+
+        # WIA scanner item property IDs. Some drivers expose only a subset.
+        [void](Set-WiaPropertyValue -Properties $item.Properties -PropertyId 6146 -Value 1 -Label "Intento color")
+        $resolutionOk = (Set-WiaPropertyValue -Properties $item.Properties -PropertyId 6147 -Value $Dpi -Label "Resolucion horizontal") -and
+            (Set-WiaPropertyValue -Properties $item.Properties -PropertyId 6148 -Value $Dpi -Label "Resolucion vertical")
+        $originOk = (Set-WiaPropertyValue -Properties $item.Properties -PropertyId 6149 -Value 0 -Label "Inicio horizontal") -and
+            (Set-WiaPropertyValue -Properties $item.Properties -PropertyId 6150 -Value 0 -Label "Inicio vertical")
+        $extentOk = (Set-WiaPropertyValue -Properties $item.Properties -PropertyId 6151 -Value $widthPixels -Label "Extension horizontal") -and
+            (Set-WiaPropertyValue -Properties $item.Properties -PropertyId 6152 -Value $heightPixels -Label "Extension vertical")
+
+        if (!$resolutionOk -or !$originOk -or !$extentOk) {
+            throw "El controlador WIA no expone las propiedades necesarias para fijar automaticamente 92 x 165 mm."
+        }
+
+        $image = $item.Transfer($jpegFormat)
+
+        if ($null -eq $image) {
+            throw "WIA no devolvió imagen en el escaneo directo."
+        }
+
+        return $image
+    } finally {
+        foreach ($comObject in @($item, $device, $manager)) {
+            if ($null -ne $comObject -and [System.Runtime.InteropServices.Marshal]::IsComObject($comObject)) {
+                try {
+                    [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($comObject)
+                } catch {
+                    # Ignore COM release errors.
+                }
+            }
+        }
+    }
+}
+
+function Invoke-WiaDialogScan {
     $jpegFormat = "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}"
     $scannerDeviceType = 1
     $intentUnspecified = 0
     $biasMaximizeQuality = 131072
 
-    $scanId = [guid]::NewGuid().ToString("N")
-    $rawPath = Join-Path $env:TEMP ("las_naves_scan_raw_{0}.jpg" -f $scanId)
-    $tempPath = Join-Path $env:TEMP ("las_naves_scan_{0}.jpg" -f $scanId)
-    $diagnosticPath = $null
+    $dialog = New-Object -ComObject WIA.CommonDialog
 
-    try {
-        $dialog = New-Object -ComObject WIA.CommonDialog
-        $image = $dialog.ShowAcquireImage(
+    return @{
+        dialog = $dialog
+        image = $dialog.ShowAcquireImage(
             $scannerDeviceType,
             $intentUnspecified,
             $biasMaximizeQuality,
@@ -323,19 +424,48 @@ function Invoke-WiaScan {
             $true,
             $true
         )
+    }
+}
+
+function Invoke-WiaScan {
+    param(
+        [bool] $AutoCrop = $false,
+        [bool] $FixedScanArea = $false,
+        [int] $PageWidthMm = 92,
+        [int] $PageHeightMm = 165,
+        [int] $Dpi = 300,
+        [int] $Quality = 76,
+        [int] $MaxSide = 1500
+    )
+
+    $jpegFormat = "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}"
+
+    $scanId = [guid]::NewGuid().ToString("N")
+    $rawPath = Join-Path $env:TEMP ("las_naves_scan_raw_{0}.jpg" -f $scanId)
+    $tempPath = Join-Path $env:TEMP ("las_naves_scan_{0}.jpg" -f $scanId)
+    $diagnosticPath = $null
+    $dialog = $null
+    $image = $null
+    $processor = $null
+    $jpegImage = $null
+
+    try {
+        if ($FixedScanArea) {
+            try {
+                $image = Invoke-WiaFixedAreaScan -WidthMm $PageWidthMm -HeightMm $PageHeightMm -Dpi $Dpi
+            } catch {
+                Write-Log "No se pudo usar area fija 92x165mm; se usara ventana WIA como respaldo. Detalle: $($_.Exception.Message)"
+            }
+        }
+
+        if ($null -eq $image) {
+            $dialogResult = Invoke-WiaDialogScan
+            $dialog = $dialogResult.dialog
+            $image = $dialogResult.image
+        }
 
         if ($null -eq $image) {
             throw "El escaneo fue cancelado o no devolvió imagen."
-        }
-
-        $processor = New-Object -ComObject WIA.ImageProcess
-        $processor.Filters.Add($processor.FilterInfos.Item("Convert").FilterID) | Out-Null
-        $processor.Filters.Item(1).Properties.Item("FormatID").Value = $jpegFormat
-        $processor.Filters.Item(1).Properties.Item("Quality").Value = 90
-        $jpegImage = $processor.Apply($image)
-
-        if ($null -eq $jpegImage) {
-            throw "WIA no pudo convertir la imagen escaneada a JPG."
         }
 
         foreach ($pathToDelete in @($rawPath, $tempPath)) {
@@ -344,10 +474,25 @@ function Invoke-WiaScan {
             }
         }
 
-        $jpegImage.SaveFile($rawPath)
+        try {
+            $processor = New-Object -ComObject WIA.ImageProcess
+            $processor.Filters.Add($processor.FilterInfos.Item("Convert").FilterID) | Out-Null
+            $processor.Filters.Item(1).Properties.Item("FormatID").Value = $jpegFormat
+            $processor.Filters.Item(1).Properties.Item("Quality").Value = 90
+            $jpegImage = $processor.Apply($image)
+
+            if ($null -eq $jpegImage) {
+                throw "WIA no pudo convertir la imagen escaneada a JPG."
+            }
+
+            $jpegImage.SaveFile($rawPath)
+        } catch {
+            Write-Log "WIA no pudo convertir directamente a JPG; se guardara la imagen original para optimizarla. Detalle: $($_.Exception.Message)"
+            $image.SaveFile($rawPath)
+        }
 
         try {
-            Save-OptimizedJpeg -SourcePath $rawPath -TargetPath $tempPath -AutoCrop $AutoCrop
+            Save-OptimizedJpeg -SourcePath $rawPath -TargetPath $tempPath -AutoCrop $AutoCrop -MaxSide $MaxSide -Quality $Quality
         } catch {
             Write-Log "No se pudo optimizar la imagen; se enviara la captura original. Detalle: $($_.Exception.Message)"
             Copy-Item -LiteralPath $rawPath -Destination $tempPath -Force
@@ -389,10 +534,77 @@ function Invoke-WiaScan {
             image = "data:image/jpeg;base64,$base64"
         }
     } finally {
+        foreach ($comObject in @($jpegImage, $processor, $image, $dialog)) {
+            if ($null -ne $comObject -and [System.Runtime.InteropServices.Marshal]::IsComObject($comObject)) {
+                try {
+                    [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($comObject)
+                } catch {
+                    # Ignore COM release errors; the next GC pass will clean up remaining handles.
+                }
+            }
+        }
+
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+        [System.GC]::Collect()
+
         foreach ($pathToDelete in @($rawPath, $tempPath)) {
             if (Test-Path -LiteralPath $pathToDelete) {
                 Remove-Item -LiteralPath $pathToDelete -Force -ErrorAction SilentlyContinue
             }
+        }
+    }
+}
+
+function Test-IsBusyScannerError {
+    param([string] $Message)
+
+    if ([string]::IsNullOrWhiteSpace($Message)) {
+        return $false
+    }
+
+    $normalized = $Message.ToUpperInvariant()
+    return $normalized.Contains("OCUPADO") -or
+        $normalized.Contains("BUSY") -or
+        $normalized.Contains("EN USO") -or
+        $normalized.Contains("WIA")
+}
+
+function Invoke-WiaScanWithRetry {
+    param(
+        [bool] $AutoCrop = $false,
+        [bool] $FixedScanArea = $false,
+        [int] $PageWidthMm = 92,
+        [int] $PageHeightMm = 165,
+        [int] $Dpi = 300,
+        [int] $Quality = 76,
+        [int] $MaxSide = 1500,
+        [int] $MaxAttempts = 3
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            if ($attempt -gt 1) {
+                Write-Log "Reintentando escaneo. Intento $attempt de $MaxAttempts."
+            }
+
+            return Invoke-WiaScan -AutoCrop $AutoCrop -FixedScanArea $FixedScanArea -PageWidthMm $PageWidthMm -PageHeightMm $PageHeightMm -Dpi $Dpi -Quality $Quality -MaxSide $MaxSide
+        } catch {
+            $message = $_.Exception.Message
+            $isBusy = Test-IsBusyScannerError -Message $message
+
+            if (!$isBusy -or $attempt -ge $MaxAttempts) {
+                if ($isBusy) {
+                    throw "El dispositivo WIA está ocupado. Cierre otras ventanas o aplicaciones de escaneo, espere unos segundos y vuelva a intentar. Si continúa, apague y encienda el escáner."
+                }
+
+                throw
+            }
+
+            Write-Log "WIA ocupado; liberando recursos y esperando antes de reintentar."
+            [System.GC]::Collect()
+            [System.GC]::WaitForPendingFinalizers()
+            Start-Sleep -Seconds 3
         }
     }
 }
@@ -504,16 +716,47 @@ try {
                 Write-Log "Solicitud de escaneo recibida."
                 $payload = Get-RequestJson -Request $request
                 $autoCrop = $false
+                $fixedScanArea = $false
+                $pageWidthMm = 92
+                $pageHeightMm = 165
+                $dpi = 300
+                $quality = 76
+                $maxSide = 1500
 
                 if ($null -ne $payload) {
                     $autoCrop = [bool]($payload.auto_crop -or $payload.autoCrop -or $payload.crop_document -or $payload.cropDocument)
+                    $fixedScanArea = [bool]($payload.fixed_scan_area -or $payload.fixedScanArea)
+
+                    if ($payload.page_width_mm -or $payload.pageWidthMm) {
+                        $pageWidthMm = if ($payload.page_width_mm) { [int]$payload.page_width_mm } else { [int]$payload.pageWidthMm }
+                    }
+
+                    if ($payload.page_height_mm -or $payload.pageHeightMm) {
+                        $pageHeightMm = if ($payload.page_height_mm) { [int]$payload.page_height_mm } else { [int]$payload.pageHeightMm }
+                    }
+
+                    if ($payload.dpi) {
+                        $dpi = [int]$payload.dpi
+                    }
+
+                    if ($payload.jpeg_quality -or $payload.jpegQuality) {
+                        $quality = if ($payload.jpeg_quality) { [int]$payload.jpeg_quality } else { [int]$payload.jpegQuality }
+                    }
+
+                    if ($payload.max_side -or $payload.maxSide) {
+                        $maxSide = if ($payload.max_side) { [int]$payload.max_side } else { [int]$payload.maxSide }
+                    }
                 }
 
                 if ($autoCrop) {
                     Write-Log "Recorte automatico solicitado por el navegador."
                 }
 
-                $scan = Invoke-WiaScan -AutoCrop $autoCrop
+                if ($fixedScanArea) {
+                    Write-Log "Perfil de identidad solicitado: $pageWidthMm x $pageHeightMm mm, $dpi DPI."
+                }
+
+                $scan = Invoke-WiaScanWithRetry -AutoCrop $autoCrop -FixedScanArea $fixedScanArea -PageWidthMm $pageWidthMm -PageHeightMm $pageHeightMm -Dpi $dpi -Quality $quality -MaxSide $maxSide
                 $response = New-HttpResponse -StatusCode 200 -Body (ConvertTo-JsonText $scan)
                 Write-Log "Escaneo enviado al navegador."
             }

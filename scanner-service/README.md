@@ -37,7 +37,10 @@ SCANNER_SERVICE_URL=http://127.0.0.1:8765/scan
 - Cada escaneo correcto guarda una copia de diagnostico en `scanner-service\ultimos-escaneos`. Si la hoja pasa pero el navegador no muestra imagen, revise primero esa carpeta.
 - Si la hoja pasa pero no aparece en el sistema, abra `http://127.0.0.1:8765/last-scan.jpg` en el mismo computador del asesor. Si ahi se ve, cierre y abra nuevamente el servicio y actualice el sistema con `Ctrl + F5`.
 - Si aparece `El dispositivo WIA no esta en linea`, apague y encienda el escaner, revise el cable/red y confirme que Windows pueda escanear desde la aplicacion `Fax y Escaner de Windows` o `Escaner`.
+- Si aparece `El dispositivo WIA esta ocupado`, cierre cualquier ventana de escaneo abierta, espere unos segundos y vuelva a intentar. El servicio reintenta automaticamente hasta 3 veces, pero si Windows dejo bloqueado el equipo conviene cerrar `Fax y Escaner de Windows`, la aplicacion del fabricante o reiniciar el escaner.
 - En cedula y papeleta, el sistema solicita recorte automatico para conservar solo el documento y evitar que entre toda la bandeja del escaner.
+- En cedula y papeleta, el navegador solicita al servicio un perfil de identidad de `92 x 165 mm` a `300 DPI`. El servicio intenta fijar esas medidas directamente en WIA. Si el controlador no expone esas propiedades, usa la ventana WIA como respaldo; en ese caso seleccione manualmente `Sobre 6 3/4 - 92 x 165 mm`.
+- Para mejorar el OCR, el perfil de identidad guarda JPG con mayor calidad que los documentos normales y conserva mas resolucion antes de armar el PDF.
 - Las imagenes se reducen y recomprimen antes de enviarse al sistema para que los PDF del expediente no queden pesados.
 
 ## Prueba rapida

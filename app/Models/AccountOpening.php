@@ -69,6 +69,11 @@ class AccountOpening extends Model
         return $this->hasOne(PersonalDataConsent::class);
     }
 
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(UploadedDocument::class);
