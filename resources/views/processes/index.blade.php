@@ -19,25 +19,6 @@
                 <a class="button secondary" href="{{ route('consents.index') }}">Revisar</a>
             </article>
         @else
-            @if (auth()->user()->isAdministrator())
-                <article class="process-card process-card-featured enabled">
-                    <div class="process-icon">R</div>
-                    <div>
-                        <h2>Reportes operativos</h2>
-                        <p>Consulta global de expedientes, agencias, documentos y tiempos del proceso.</p>
-                    </div>
-                    <a class="button secondary" href="{{ route('reports.index') }}">Ver reportes</a>
-                </article>
-                <article class="process-card process-card-featured enabled">
-                    <div class="process-icon">S</div>
-                    <div>
-                        <h2>Salud del sistema</h2>
-                        <p>Revise conexión, almacenamiento privado, formatos y configuración sensible.</p>
-                    </div>
-                    <a class="button secondary" href="{{ route('system-health.index') }}">Revisar</a>
-                </article>
-            @endif
-
             @foreach ($processes as $process)
                 <article class="process-card {{ $process->is_enabled ? 'enabled' : 'disabled' }}">
                     <div class="process-icon">{{ strtoupper(substr($process->name, 0, 1)) }}</div>

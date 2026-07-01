@@ -2,16 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ConfirmExpedientNameRequest;
-use App\Http\Requests\SaveExternalEvidenceRequest;
-use App\Http\Requests\SaveServicesRequest;
-use App\Http\Requests\StoreAccountOpeningRequest;
-use App\Http\Requests\UpdateAccountOpeningRequest;
-use App\Http\Requests\UploadConsentRequest;
-use App\Http\Requests\UploadRequirementRequest;
 use App\Models\AccountOpening;
 use App\Models\AccountType;
 use App\Models\AccountTypeRequirement;
+use App\Models\ActionHistory;
 use App\Models\AdditionalService;
 use App\Models\ExternalCheckEvidence;
 use App\Models\ExternalCheckItem;
@@ -21,8 +15,6 @@ use App\Models\OperationalCheckRecord;
 use App\Models\PersonalDataConsent;
 use App\Models\SelectedAdditionalService;
 use App\Models\UploadedDocument;
-use App\Services\AuditLogService;
-use App\Services\AccountOpeningWorkflowService;
 use App\Services\AutomatedReviewService;
 use App\Services\DocumentExtractionService;
 use App\Services\SignatureValidationService;
@@ -46,9 +38,11 @@ class AccountOpeningController extends Controller
         ]);
     }
 
-    public function store(StoreAccountOpeningRequest $request)
+    public function store(Request $request)
     {
-        $data = $request->validated();
+        $data = $request->validate([
+            'account_type_id' => ['required', 'exists:account_types,id'],
+        ]);
 
         $opening = DB::transaction(function () use ($data) {
             $publicCode = $this->makePublicCode();
@@ -109,9 +103,15 @@ class AccountOpeningController extends Controller
         ]);
     }
 
-    public function updateMember(UpdateAccountOpeningRequest $request, AccountOpening $opening)
+    public function updateMember(Request $request, AccountOpening $opening)
     {
-        $data = $request->validated();
+        $data = $request->validate([
+            'member_identification' => ['nullable', 'digits:10'],
+            'member_first_names' => ['nullable', 'string', 'max:120'],
+            'member_last_names' => ['nullable', 'string', 'max:120'],
+            'member_nationality' => ['nullable', 'string', 'max:80'],
+            'member_address' => ['nullable', 'string', 'max:200'],
+        ]);
 
         $opening->update($data);
         $this->audit($opening, 'actualizar_datos_socio', 'Datos principales del socio actualizados.');
@@ -193,9 +193,16 @@ class AccountOpeningController extends Controller
             ->with('success', 'Requisitos opcionales actualizados.');
     }
 
-    public function uploadConsent(UploadConsentRequest $request, AccountOpening $opening)
+    public function uploadConsent(Request $request, AccountOpening $opening)
     {
-        $data = $request->validated();
+        $data = $request->validate([
+            'signed_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:'.self::MAX_FILE_KB],
+            'manual_signature_confirmed' => ['required', 'accepted'],
+            'observations' => ['nullable', 'string', 'max:500'],
+        ], [
+            'manual_signature_confirmed.required' => 'Debe revisar visualmente el consentimiento y confirmar que contiene la firma.',
+            'manual_signature_confirmed.accepted' => 'Debe confirmar manualmente que el consentimiento contiene firma.',
+        ]);
 
         $signatureValidator = app(SignatureValidationService::class);
         $signatureError = $signatureValidator->validationError(
@@ -313,18 +320,20 @@ class AccountOpeningController extends Controller
 
         abort_unless($consent->signed_file_path && Storage::exists($consent->signed_file_path), 404);
 
-        app(AuditLogService::class)->record(
-            'visualizar_consentimiento',
-            'Consentimiento firmado abierto desde control protegido.',
-            ['opening' => $opening, 'consent' => $consent]
-        );
-
         return response()->file(Storage::path($consent->signed_file_path));
     }
 
-    public function uploadRequirement(UploadRequirementRequest $request, AccountOpening $opening)
+    public function uploadRequirement(Request $request, AccountOpening $opening)
     {
-        $data = $request->validated();
+        $data = $request->validate([
+            'account_type_requirement_id' => [
+                'required',
+                Rule::exists('account_type_requirements', 'id')->where('account_type_id', $opening->account_type_id),
+            ],
+            'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:'.self::MAX_FILE_KB],
+            'status' => ['required', Rule::in(['cargado', 'validado', 'rechazado'])],
+            'observations' => ['nullable', 'string', 'max:500'],
+        ]);
 
         $requirement = AccountTypeRequirement::with('type')->findOrFail($data['account_type_requirement_id']);
         $path = $this->storeFile($request->file('file'), $opening, 'requisitos', $requirement->file_name_pattern);
@@ -506,10 +515,7 @@ class AccountOpeningController extends Controller
         );
         $extracted = app(DocumentExtractionService::class)->extract($slug, $file, true);
 
-        $document->update([
-            'extracted_data' => $extracted,
-            ...$this->extractionTracking($extracted),
-        ]);
+        $document->update(['extracted_data' => $extracted]);
         $this->syncMemberDataFromExtraction($opening, $slug, $extracted);
         $this->audit($opening, 'extraer_datos_requisito', "Datos extraídos nuevamente de {$requirement->label}.");
 
@@ -528,7 +534,7 @@ class AccountOpeningController extends Controller
             ->with('success', 'Datos extraídos. Puede copiarlos desde el requisito.');
     }
 
-    public function uploadExternalEvidence(SaveExternalEvidenceRequest $request, AccountOpening $opening)
+    public function uploadExternalEvidence(Request $request, AccountOpening $opening)
     {
         if (!$this->consentIsValid($opening)) {
             return redirect()
@@ -536,7 +542,20 @@ class AccountOpeningController extends Controller
                 ->withErrors('Debe cargar y validar el consentimiento firmado antes de continuar.');
         }
 
-        $data = $request->validated();
+        $data = $request->validate([
+            'evidence_images' => ['nullable', 'array'],
+            'evidence_images.*' => ['nullable', 'array'],
+            'evidence_images.*.*' => ['nullable', 'string'],
+            'results' => ['required', 'array'],
+            'results.*' => ['required', 'array'],
+            'results.*.*' => [Rule::in(['sin_novedad', 'con_observacion', 'no_aplica', 'pendiente'])],
+            'observations' => ['nullable', 'array'],
+            'observations.*' => ['nullable', 'array'],
+            'observations.*.*' => ['nullable', 'string', 'max:500'],
+            'company_check_applicable' => ['nullable', 'boolean'],
+            'include_system_360' => ['nullable', 'boolean'],
+            'system_360_file' => ['nullable', 'file', 'mimes:pdf', 'max:'.self::MAX_FILE_KB],
+        ]);
 
         if (!$this->requiredDocumentsAreValid($opening)) {
             return redirect()
@@ -677,7 +696,7 @@ class AccountOpeningController extends Controller
             ->with('success', 'Evidencia externa guardada.');
     }
 
-    public function confirmFileName(ConfirmExpedientNameRequest $request, AccountOpening $opening)
+    public function confirmFileName(Request $request, AccountOpening $opening)
     {
         if (!$this->externalChecksAreComplete($opening)) {
             return redirect()
@@ -691,7 +710,15 @@ class AccountOpeningController extends Controller
                 ->withErrors('El nombre definitivo del expediente ya fue asignado.');
         }
 
-        $data = $request->validated();
+        $request->merge([
+            'file_name' => trim((string) $request->input('file_name')),
+        ]);
+
+        $data = $request->validate([
+            'file_name' => ['required', 'string', 'max:120', Rule::unique('account_openings', 'file_name')],
+        ], [
+            'file_name.unique' => 'Ya existe un expediente con este número o nombre en la cooperativa.',
+        ]);
 
         $oldName = $opening->file_name;
         $newName = $data['file_name'];
@@ -1035,7 +1062,7 @@ class AccountOpeningController extends Controller
         ]);
     }
 
-    public function saveServices(SaveServicesRequest $request, AccountOpening $opening)
+    public function saveServices(Request $request, AccountOpening $opening)
     {
         if (!$opening->file_name_confirmed) {
             return redirect()
@@ -1054,7 +1081,14 @@ class AccountOpeningController extends Controller
                 ->withErrors('Complete los documentos internos antes de registrar servicios adicionales.');
         }
 
-        $data = $request->validated();
+        $data = $request->validate([
+            'fondo_mortuorio' => ['required', Rule::in(['si', 'no'])],
+            'tipo_vinculacion' => [
+                Rule::requiredIf($this->contributionCertificateApplies($opening)),
+                'nullable',
+                Rule::in(['socio', 'cliente']),
+            ],
+        ]);
 
         DB::transaction(function () use ($opening, $data) {
             SelectedAdditionalService::where('account_opening_id', $opening->id)->delete();
@@ -1164,11 +1198,6 @@ class AccountOpeningController extends Controller
         }
 
         abort_unless($templatePath && is_file(public_path($templatePath)), 404);
-
-        $this->audit($opening, 'abrir_formato_original_servicio', "Formato original de servicio abierto: {$template->name}.", [
-            'template_id' => $template->id,
-            'template_path' => $templatePath,
-        ]);
 
         return response()->file(public_path($templatePath), [
             'Content-Type' => 'application/pdf',
@@ -1565,25 +1594,9 @@ class AccountOpeningController extends Controller
                 'file_size' => $fileSize,
                 'status' => $status,
                 'extracted_data' => $extracted,
-                ...$this->extractionTracking($extracted),
                 'uploaded_by' => auth()->id(),
             ]
         );
-    }
-
-    private function extractionTracking(array $extracted): array
-    {
-        $confidence = $extracted['confianza'] ?? null;
-
-        return [
-            'extraction_source' => $extracted['fuente_usada'] ?? $extracted['fuente_texto'] ?? null,
-            'extraction_confidence' => is_numeric($confidence) ? max(0, min(100, (int) $confidence)) : null,
-            'requires_manual_data_review' => (bool) (
-                $extracted['requiere_revision_manual_datos']
-                ?? $extracted['requiere_validacion_manual']
-                ?? false
-            ),
-        ];
     }
 
     private function expectedScanCaptures(string $slug): array
@@ -2789,24 +2802,68 @@ class AccountOpeningController extends Controller
 
     private function workflowState(AccountOpening $opening): array
     {
-        return app(AccountOpeningWorkflowService::class)->workflowState($opening);
+        $consentComplete = $this->consentIsValid($opening);
+        $requirementsComplete = $this->requiredDocumentsAreValid($opening);
+
+        $complete = [
+            'requisitos' => $requirementsComplete && $consentComplete,
+            'externas' => $this->externalChecksAreComplete($opening),
+            'expediente' => $opening->file_name_confirmed,
+            'internos' => $this->internalDocumentsAreComplete($opening),
+            'servicios' => $this->serviceDocumentsAreComplete($opening),
+            'resumen' => in_array($opening->status, ['en_revision', 'aprobado', 'finalizado'], true),
+        ];
+
+        $unlocked = [
+            'requisitos' => true,
+            'externas' => $complete['requisitos'],
+            'expediente' => $complete['externas'],
+            'internos' => $complete['expediente'],
+            'servicios' => $complete['internos'],
+            'resumen' => $complete['servicios'],
+        ];
+
+        foreach ($complete as $step => $isComplete) {
+            if (!$isComplete && $unlocked[$step]) {
+                return ['complete' => $complete, 'unlocked' => $unlocked, 'current' => $step];
+            }
+        }
+
+        return ['complete' => $complete, 'unlocked' => $unlocked, 'current' => 'resumen'];
     }
 
     private function readyToSubmit(AccountOpening $opening): bool
     {
-        return app(AccountOpeningWorkflowService::class)->readyToSubmit($opening);
+        return $this->consentIsValid($opening)
+            && $this->requiredDocumentsAreValid($opening)
+            && $this->externalChecksAreComplete($opening)
+            && $opening->file_name_confirmed
+            && $this->internalDocumentsAreComplete($opening)
+            && $this->serviceDocumentsAreComplete($opening);
     }
 
     private function calculateProgress(AccountOpening $opening): int
     {
-        return app(AccountOpeningWorkflowService::class)->calculateProgress($opening);
+        $checks = [
+            $this->consentIsValid($opening) && $this->requiredDocumentsAreValid($opening),
+            $this->externalChecksAreComplete($opening),
+            $opening->file_name_confirmed,
+            $this->internalDocumentsAreComplete($opening),
+            $this->serviceDocumentsAreComplete($opening),
+            in_array($opening->status, ['en_revision', 'aprobado', 'finalizado'], true),
+        ];
+
+        return (int) round((count(array_filter($checks)) / count($checks)) * 100);
     }
 
     private function audit(AccountOpening $opening, string $action, string $description, ?array $metadata = null): void
     {
-        app(AuditLogService::class)->record($action, $description, [
-            'opening' => $opening,
-            'metadata' => $metadata ?? [],
+        ActionHistory::create([
+            'account_opening_id' => $opening->id,
+            'user_id' => auth()->id(),
+            'action' => $action,
+            'description' => $description,
+            'metadata' => $metadata,
         ]);
     }
 }

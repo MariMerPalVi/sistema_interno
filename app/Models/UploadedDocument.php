@@ -18,17 +18,12 @@ class UploadedDocument extends Model
         'file_size',
         'status',
         'extracted_data',
-        'extraction_source',
-        'extraction_confidence',
-        'requires_manual_data_review',
         'manual_signature_confirmed',
         'uploaded_by',
     ];
 
     protected $casts = [
         'extracted_data' => 'array',
-        'extraction_confidence' => 'integer',
-        'requires_manual_data_review' => 'boolean',
         'manual_signature_confirmed' => 'boolean',
     ];
 }

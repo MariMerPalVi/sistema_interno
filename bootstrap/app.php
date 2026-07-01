@@ -4,8 +4,6 @@ use Illuminate\Foundation\Application;
 use App\Http\Middleware\EnsureCanReviewConsents;
 use App\Http\Middleware\EnsureCanUseAccountOpenings;
 use App\Http\Middleware\EnsureCanUseDataUpdates;
-use App\Http\Middleware\EnsurePasswordHasBeenChanged;
-use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
@@ -20,8 +18,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'account-openings' => EnsureCanUseAccountOpenings::class,
             'data-updates' => EnsureCanUseDataUpdates::class,
             'review-consents' => EnsureCanReviewConsents::class,
-            'password.changed' => EnsurePasswordHasBeenChanged::class,
-            'user.active' => EnsureUserIsActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

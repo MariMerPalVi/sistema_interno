@@ -4,10 +4,8 @@ use App\Http\Controllers\AccountOpeningController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConsentReviewController;
 use App\Http\Controllers\DataUpdateController;
-use App\Http\Controllers\OperationalReportController;
 use App\Http\Controllers\ProcessController;
 use App\Http\Controllers\ProtectedAssetController;
-use App\Http\Controllers\SystemHealthController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -15,18 +13,11 @@ Route::middleware('guest')->group(function () {
     Route::post('/ingresar', [AuthController::class, 'store'])->name('login.store');
 });
 
-Route::middleware(['auth', 'user.active'])->group(function () {
+Route::middleware('auth')->group(function () {
     Route::post('/salir', [AuthController::class, 'destroy'])->name('logout');
     Route::get('/mi-contrasena', [AuthController::class, 'editPassword'])->name('password.edit');
     Route::put('/mi-contrasena', [AuthController::class, 'updatePassword'])->name('password.update');
-    Route::put('/usuarios/{user}/contrasena-temporal', [AuthController::class, 'resetTemporaryPassword'])
-        ->middleware('password.changed')
-        ->name('users.password.reset-temporary');
-
-    Route::middleware('password.changed')->group(function () {
     Route::get('/', [ProcessController::class, 'index'])->name('processes.index');
-    Route::get('/reportes', [OperationalReportController::class, 'index'])->name('reports.index');
-    Route::get('/salud-sistema', [SystemHealthController::class, 'index'])->name('system-health.index');
     Route::get('/consentimientos', [ConsentReviewController::class, 'index'])
         ->middleware('review-consents')
         ->name('consents.index');
@@ -80,6 +71,5 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::post('/{opening}/servicios/documentos/escanear', [AccountOpeningController::class, 'uploadScannedServiceDocument'])->name('services.documents.scan');
         Route::post('/{opening}/servicios', [AccountOpeningController::class, 'saveServices'])->name('services.save');
         Route::post('/{opening}/enviar-revision', [AccountOpeningController::class, 'submitReview'])->name('submit');
-    });
     });
 });
