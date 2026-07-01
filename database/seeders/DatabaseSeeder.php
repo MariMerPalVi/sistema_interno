@@ -51,6 +51,10 @@ class DatabaseSeeder extends Seeder
             ]);
             if (!$user->exists) {
                 $user->password = Hash::make('Cambio123!');
+                $user->must_change_password = true;
+                $user->password_changed_at = null;
+                $user->failed_login_attempts = 0;
+                $user->locked_until = null;
             }
             $user->save();
         }

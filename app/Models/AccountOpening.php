@@ -39,13 +39,15 @@ class AccountOpening extends Model
 
     public function resolveRouteBinding($value, $field = null)
     {
+        $user = auth()->user();
+
         return $this->where(function ($query) use ($value) {
             $query->where('public_code', $value)
                 ->when(is_numeric($value), fn ($query) => $query->orWhere('id', $value));
         })
             ->when(
-                auth()->check() && !auth()->user()->isAdministrator(),
-                fn ($query) => $query->where('agency', auth()->user()->agency)
+                $user && !$user->isAdministrator() && !$user->canReviewConsents(),
+                fn ($query) => $query->where('agency', $user->agency)
             )
             ->firstOrFail();
     }

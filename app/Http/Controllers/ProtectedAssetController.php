@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AuditLogService;
+use Illuminate\Http\Request;
+
 class ProtectedAssetController extends Controller
 {
-    public function certificateSignature(string $authority)
+    public function certificateSignature(Request $request, string $authority)
     {
+        abort_unless($request->user()?->canAccessProtectedAssets(), 403);
+
         $signatures = [
             'presidente' => [
                 'path' => resource_path('assets/signatures/nancy-alegria.avif'),
@@ -20,6 +25,12 @@ class ProtectedAssetController extends Controller
         abort_unless(isset($signatures[$authority]), 404);
         $signature = $signatures[$authority];
         abort_unless(is_file($signature['path']), 404);
+
+        app(AuditLogService::class)->record(
+            'visualizar_firma_certificado',
+            "Firma protegida abierta: {$authority}.",
+            ['authority' => $authority]
+        );
 
         return response()->file($signature['path'], [
             'Content-Type' => $signature['type'],

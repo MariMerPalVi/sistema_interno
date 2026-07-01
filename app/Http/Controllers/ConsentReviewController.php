@@ -19,7 +19,11 @@ class ConsentReviewController extends Controller
 
         $user = $request->user();
 
-        abort_unless($user->canReviewConsents(), 403, 'Solo el perfil de la abogada puede revisar el control de consentimientos.');
+        abort_unless(
+            $user->canReviewConsents() || $user->isAdministrator(),
+            403,
+            'Solo el perfil de la abogada o administrador puede revisar el control de consentimientos.'
+        );
 
         $agencies = collect(config('opening.agencies'))
             ->map(fn ($agency, $key) => ['key' => $key, 'name' => $agency['name']])

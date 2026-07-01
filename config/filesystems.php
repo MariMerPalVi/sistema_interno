@@ -6,7 +6,7 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            'serve' => env('FILESYSTEM_SERVE', false),
             'throw' => false,
         ],
         'public' => [

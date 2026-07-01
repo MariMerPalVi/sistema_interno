@@ -18,6 +18,7 @@ Aplicacion Laravel + Vite para procesos internos de una cooperativa. La primera 
 - Check List del expediente con documentos adjuntados e historial de auditoria.
 - Revision digital automatica del expediente, con estado aprobado u observado, puntaje y hallazgos.
 - Escaneo local asistido mediante servicio Windows en cada computador del asesor.
+- Reportes administrativos, salud del sistema y controles de seguridad documentados.
 
 ## Requisitos locales
 
@@ -78,6 +79,10 @@ npm.cmd run build
 ```text
 http://localhost/sistema_interno/public
 ```
+
+## Operación y seguridad
+
+Revise [docs/OPERACION_SEGURIDAD.md](docs/OPERACION_SEGURIDAD.md) para permisos por rol, rutas sensibles, auditoría, reportes, salud del sistema y comandos de mantenimiento.
 
 ## Escaner local
 

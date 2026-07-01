@@ -1,7 +1,7 @@
 param(
     [string] $HostAddress = "127.0.0.1",
     [int] $Port = 8765,
-    [switch] $KeepDiagnosticCopies = $true
+    [switch] $KeepDiagnosticCopies
 )
 
 $ErrorActionPreference = "Stop"
