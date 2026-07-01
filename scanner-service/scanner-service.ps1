@@ -434,8 +434,8 @@ function Invoke-WiaScan {
         [int] $PageWidthMm = 92,
         [int] $PageHeightMm = 165,
         [int] $Dpi = 300,
-        [int] $Quality = 76,
-        [int] $MaxSide = 1500
+        [int] $Quality = 80,
+        [int] $MaxSide = 1800
     )
 
     $jpegFormat = "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}"
@@ -478,7 +478,7 @@ function Invoke-WiaScan {
             $processor = New-Object -ComObject WIA.ImageProcess
             $processor.Filters.Add($processor.FilterInfos.Item("Convert").FilterID) | Out-Null
             $processor.Filters.Item(1).Properties.Item("FormatID").Value = $jpegFormat
-            $processor.Filters.Item(1).Properties.Item("Quality").Value = 90
+            $processor.Filters.Item(1).Properties.Item("Quality").Value = [Math]::Min(95, [Math]::Max(80, $Quality))
             $jpegImage = $processor.Apply($image)
 
             if ($null -eq $jpegImage) {
@@ -487,7 +487,7 @@ function Invoke-WiaScan {
 
             $jpegImage.SaveFile($rawPath)
         } catch {
-            Write-Log "WIA no pudo convertir directamente a JPG; se guardara la imagen original para optimizarla. Detalle: $($_.Exception.Message)"
+            Write-Log "El controlador WIA entrego la imagen en formato nativo; se convertira internamente a JPG. Detalle: $($_.Exception.Message)"
             $image.SaveFile($rawPath)
         }
 
@@ -577,8 +577,8 @@ function Invoke-WiaScanWithRetry {
         [int] $PageWidthMm = 92,
         [int] $PageHeightMm = 165,
         [int] $Dpi = 300,
-        [int] $Quality = 76,
-        [int] $MaxSide = 1500,
+        [int] $Quality = 80,
+        [int] $MaxSide = 1800,
         [int] $MaxAttempts = 3
     )
 

@@ -390,9 +390,9 @@ if (scannerDialog instanceof HTMLDialogElement) {
           fixed_scan_area: scanState.scanProfile === 'identity_92x165',
           page_width_mm: scanState.scanProfile === 'identity_92x165' ? 92 : null,
           page_height_mm: scanState.scanProfile === 'identity_92x165' ? 165 : null,
-          dpi: scanState.scanProfile === 'identity_92x165' ? 300 : null,
-          jpeg_quality: scanState.scanProfile === 'identity_92x165' ? 90 : null,
-          max_side: scanState.scanProfile === 'identity_92x165' ? 2400 : null,
+          dpi: scanState.scanProfile === 'identity_92x165' ? 400 : null,
+          jpeg_quality: scanState.scanProfile === 'identity_92x165' ? 94 : null,
+          max_side: scanState.scanProfile === 'identity_92x165' ? 3000 : null,
         }),
       });
     } catch (error) {
@@ -564,7 +564,7 @@ if (scannerDialog instanceof HTMLDialogElement) {
       signatureCheckbox,
       statusSelect,
       steps,
-      autoCrop: isIdentityScan,
+      autoCrop: false,
       scanProfile: isIdentityScan ? 'identity_92x165' : 'document',
       allowPartialSubmit: button.dataset.scanMode === 'multi-page',
       captures: {},
@@ -606,13 +606,11 @@ if (scannerDialog instanceof HTMLDialogElement) {
 document.querySelectorAll('.external-evidence-form').forEach((form) => {
   const companyChoice = form.querySelector('input[name="company_check_applicable"]');
   const companySection = form.querySelector('[data-external-subject="empresa"]');
+  const system360Choice = form.querySelector('input[name="include_system_360"]');
+  const system360Upload = form.querySelector('[data-external-360-upload]');
 
-  const syncCompanySection = () => {
-    if (!companyChoice || !companySection) return;
-
-    const enabled = companyChoice.checked;
-    companySection.hidden = !enabled;
-    companySection.querySelectorAll('input, select').forEach((control) => {
+  const syncControlState = (container, enabled) => {
+    container.querySelectorAll('input, select').forEach((control) => {
       control.disabled = !enabled;
       if (control.classList.contains('pasted-evidence-input')) {
         control.required = enabled && control.dataset.hasEvidence !== '1';
@@ -620,8 +618,31 @@ document.querySelectorAll('.external-evidence-form').forEach((form) => {
     });
   };
 
+  const syncCompanySection = () => {
+    if (!companyChoice || !companySection) return;
+
+    const enabled = companyChoice.checked;
+    companySection.hidden = !enabled;
+    syncControlState(companySection, enabled);
+  };
+
+  const syncSystem360Upload = () => {
+    const enabled = Boolean(system360Choice?.checked);
+    if (!system360Upload) return;
+
+    system360Upload.hidden = !enabled;
+    system360Upload.querySelectorAll('input').forEach((control) => {
+      control.disabled = !enabled;
+      if (control.type === 'file') {
+        control.required = enabled && control.dataset.hasEvidence !== '1';
+      }
+    });
+  };
+
   companyChoice?.addEventListener('change', syncCompanySection);
+  system360Choice?.addEventListener('change', syncSystem360Upload);
   syncCompanySection();
+  syncSystem360Upload();
 
   form.addEventListener('submit', (event) => {
     const inputs = Array.from(form.querySelectorAll('.pasted-evidence-input:not(:disabled)'));

@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use setasign\Fpdi\Fpdi;
 
 class AccountOpeningController extends Controller
 {
@@ -550,6 +551,8 @@ class AccountOpeningController extends Controller
             'observations.*' => ['nullable', 'array'],
             'observations.*.*' => ['nullable', 'string', 'max:500'],
             'company_check_applicable' => ['nullable', 'boolean'],
+            'include_system_360' => ['nullable', 'boolean'],
+            'system_360_file' => ['nullable', 'file', 'mimes:pdf', 'max:'.self::MAX_FILE_KB],
         ]);
 
         if (!$this->requiredDocumentsAreValid($opening)) {
@@ -558,13 +561,66 @@ class AccountOpeningController extends Controller
                 ->withErrors('Complete y valide todos los documentos obligatorios antes de registrar consultas externas.');
         }
 
-        $items = ExternalCheckItem::where('active', true)->orderBy('sort_order')->get();
+        $includeSystem360 = $request->boolean('include_system_360');
+        $system360Item = ExternalCheckItem::where('active', true)
+            ->where('name', 'like', '%360%')
+            ->first();
+        $items = ExternalCheckItem::where('active', true)
+            ->orderBy('sort_order')
+            ->get()
+            ->reject(fn ($item) => $system360Item && $item->id === $system360Item->id)
+            ->values();
         $companyApplicable = $request->boolean('company_check_applicable');
         $subjects = $this->externalCheckSubjects($opening, $companyApplicable);
+        $system360Path = null;
+
+        if ($includeSystem360 && $system360Item) {
+            $system360Path = $opening->externalEvidences()
+                ->where('external_check_item_id', $system360Item->id)
+                ->where('subject_key', 'titular')
+                ->value('screenshot_path');
+
+            if ($request->hasFile('system_360_file')) {
+                $system360Path = $this->storeFile(
+                    $request->file('system_360_file'),
+                    $opening,
+                    'consultas',
+                    'Revisión Sistema 360_{expediente}'
+                );
+            }
+
+            if (!$system360Path) {
+                return redirect()
+                    ->route('accounts.show', [$opening, 'paso' => 'externas'])
+                    ->withErrors('Adjunte el PDF de la revisión 360 o desactive esa opción.');
+            }
+
+            ExternalCheckEvidence::updateOrCreate(
+                [
+                    'account_opening_id' => $opening->id,
+                    'external_check_item_id' => $system360Item->id,
+                    'subject_key' => 'titular',
+                ],
+                [
+                    'result' => 'sin_novedad',
+                    'screenshot_path' => $system360Path,
+                    'advisor_observation' => 'Documento de revisión 360 adjunto al expediente.',
+                    'uploaded_by' => auth()->id(),
+                    'uploaded_at' => now(),
+                ]
+            );
+        }
+
+        if (!$includeSystem360 && $system360Item) {
+            $opening->externalEvidences()
+                ->where('external_check_item_id', $system360Item->id)
+                ->delete();
+        }
 
         foreach ($subjects as $subjectKey => $subjectLabel) {
             $existingPath = $opening->externalEvidences()
                 ->where('subject_key', $subjectKey)
+                ->when($system360Item, fn ($query) => $query->where('external_check_item_id', '!=', $system360Item->id))
                 ->whereNotNull('screenshot_path')
                 ->value('screenshot_path');
             $subjectImages = $data['evidence_images'][$subjectKey] ?? [];
@@ -588,7 +644,8 @@ class AccountOpeningController extends Controller
                     $items,
                     $subjectImages,
                     $opening,
-                    "Revisión listas de control {$subjectLabel}_{expediente}"
+                    "Revisión listas de control {$subjectLabel}_{expediente}",
+                    $includeSystem360 && $system360Path ? [$system360Path] : []
                 )
                 : $existingPath;
 
@@ -596,6 +653,10 @@ class AccountOpeningController extends Controller
                 return redirect()
                     ->route('accounts.show', [$opening, 'paso' => 'externas'])
                     ->withErrors("Complete las evidencias de {$subjectLabel} antes de continuar.");
+            }
+
+            if (!$mustGeneratePdf && $includeSystem360 && $system360Path && $request->hasFile('system_360_file')) {
+                $this->mergePdfStorageFiles([$path, $system360Path], $path);
             }
 
             foreach ($items as $item) {
@@ -620,7 +681,10 @@ class AccountOpeningController extends Controller
             $opening,
             'cargar_evidencia_externa',
             'Evidencias de consulta externa registradas.',
-            ['company_check_applicable' => $companyApplicable]
+            [
+                'company_check_applicable' => $companyApplicable,
+                'include_system_360' => $includeSystem360,
+            ]
         );
 
         $nextStep = $this->externalChecksAreComplete($opening) ? 'expediente' : 'externas';
@@ -1412,10 +1476,16 @@ class AccountOpeningController extends Controller
 
         $images = [];
         $storedCaptures = [];
+        $isIdentityBundle = in_array($slug, ['cedula', 'cedula-papeleta', 'cedula-menor'], true);
 
         foreach ($expectedCaptures as $captureConfig) {
             $capture = $captures->get($captureConfig['key']);
             $jpeg = $this->decodeScannedJpeg((string) $capture['image']);
+            $jpeg = $this->optimizeJpegForStorage(
+                $jpeg,
+                $isIdentityBundle ? 2300 : 1800,
+                $isIdentityBundle ? 88 : 78
+            );
             $captureName = Str::slug($slug.' '.$captureConfig['file_name']) ?: 'documento_escaneado';
             $capturePath = "aperturas/{$opening->storage_folder}/{$captureName}.jpg";
 
@@ -1625,6 +1695,7 @@ class AccountOpeningController extends Controller
     private function storePastedImageAsPdf(string $dataUrl, AccountOpening $opening, string $step, ?string $pattern = null): string
     {
         $binary = $this->decodePastedJpeg($dataUrl);
+        $binary = $this->optimizeJpegForStorage($binary, 1600, 76);
 
         $fileName = $this->buildStoredFileName($opening, $pattern ?: 'Evidencia_{expediente}_'.Str::uuid(), 'pdf');
         $path = "aperturas/{$opening->storage_folder}/{$fileName}";
@@ -1633,22 +1704,57 @@ class AccountOpeningController extends Controller
         return $path;
     }
 
-    private function storePastedImagesAsPdf($items, array $dataUrls, AccountOpening $opening, string $pattern): string
+    private function storePastedImagesAsPdf($items, array $dataUrls, AccountOpening $opening, string $pattern, array $appendPdfPaths = []): string
     {
         $images = [];
 
         foreach ($items as $item) {
             $images[] = [
                 'title' => $item->name,
-                'jpeg' => $this->decodePastedJpeg($dataUrls[$item->id]),
+                'jpeg' => $this->optimizeJpegForStorage($this->decodePastedJpeg($dataUrls[$item->id]), 1600, 76),
             ];
         }
 
         $fileName = $this->buildStoredFileName($opening, $pattern, 'pdf');
         $path = "aperturas/{$opening->storage_folder}/{$fileName}";
-        Storage::put($path, $this->makePdfFromJpegs($images));
+
+        if (empty($appendPdfPaths)) {
+            Storage::put($path, $this->makePdfFromJpegs($images));
+
+            return $path;
+        }
+
+        $tempPath = "aperturas/{$opening->storage_folder}/tmp_".Str::uuid().'.pdf';
+        Storage::put($tempPath, $this->makePdfFromJpegs($images));
+        $this->mergePdfStorageFiles(array_merge([$tempPath], $appendPdfPaths), $path);
+        Storage::delete($tempPath);
 
         return $path;
+    }
+
+    private function mergePdfStorageFiles(array $sourcePaths, string $targetPath): void
+    {
+        $pdf = new Fpdi();
+
+        foreach ($sourcePaths as $sourcePath) {
+            if (!Storage::exists($sourcePath)) {
+                continue;
+            }
+
+            $absolutePath = Storage::path($sourcePath);
+            $pageCount = $pdf->setSourceFile($absolutePath);
+
+            for ($pageNumber = 1; $pageNumber <= $pageCount; $pageNumber++) {
+                $templateId = $pdf->importPage($pageNumber);
+                $size = $pdf->getTemplateSize($templateId);
+                $orientation = ($size['width'] ?? 0) > ($size['height'] ?? 0) ? 'L' : 'P';
+
+                $pdf->AddPage($orientation, [$size['width'], $size['height']]);
+                $pdf->useTemplate($templateId);
+            }
+        }
+
+        Storage::put($targetPath, $pdf->Output('S'));
     }
 
     private function decodePastedJpeg(string $dataUrl): string
@@ -1985,6 +2091,64 @@ class AccountOpeningController extends Controller
     private function makePdfFromJpeg(string $jpeg): string
     {
         return $this->makePdfFromJpegs([['title' => null, 'jpeg' => $jpeg]]);
+    }
+
+    private function optimizeJpegForStorage(string $jpeg, int $maxSide = 1800, int $quality = 78): string
+    {
+        if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
+            return $jpeg;
+        }
+
+        $source = @imagecreatefromstring($jpeg);
+
+        if (!$source) {
+            return $jpeg;
+        }
+
+        $target = null;
+
+        try {
+            $width = imagesx($source);
+            $height = imagesy($source);
+
+            if ($width <= 0 || $height <= 0) {
+                return $jpeg;
+            }
+
+            $scale = min(1, $maxSide / max($width, $height));
+
+            if ($scale < 1) {
+                $targetWidth = max(1, (int) round($width * $scale));
+                $targetHeight = max(1, (int) round($height * $scale));
+                $target = imagecreatetruecolor($targetWidth, $targetHeight);
+
+                if (!$target) {
+                    return $jpeg;
+                }
+
+                $white = imagecolorallocate($target, 255, 255, 255);
+                imagefilledrectangle($target, 0, 0, $targetWidth, $targetHeight, $white);
+                imagecopyresampled($target, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
+            } else {
+                $target = $source;
+            }
+
+            ob_start();
+            @imagejpeg($target, null, max(55, min(95, $quality)));
+            $optimized = ob_get_clean();
+
+            if (is_string($optimized) && strlen($optimized) > 1000 && strlen($optimized) < strlen($jpeg)) {
+                return $optimized;
+            }
+
+            return $jpeg;
+        } finally {
+            if ($target && $target !== $source) {
+                imagedestroy($target);
+            }
+
+            imagedestroy($source);
+        }
     }
 
     private function makePdfFromJpegs(array $images): string
@@ -2345,7 +2509,10 @@ class AccountOpeningController extends Controller
 
     private function externalChecksAreComplete(AccountOpening $opening): bool
     {
-        $requiredIds = ExternalCheckItem::where('active', true)->where('is_required', true)->pluck('id');
+        $requiredIds = ExternalCheckItem::where('active', true)
+            ->where('is_required', true)
+            ->where('name', 'not like', '%360%')
+            ->pluck('id');
         $loaded = $opening->externalEvidences()->whereNotNull('screenshot_path')->get();
 
         foreach (array_keys($this->externalCheckSubjects($opening)) as $subjectKey) {

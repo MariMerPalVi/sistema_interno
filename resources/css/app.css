@@ -1315,6 +1315,13 @@ select:focus {
   accent-color: var(--primary);
 }
 
+.external-optional-choice {
+  margin-top: 8px;
+  color: var(--ink);
+  background: #eefaf6;
+  border-color: #b9eadc;
+}
+
 .external-grid > div {
   display: grid;
   gap: 11px;
@@ -1352,6 +1359,112 @@ select:focus {
 .external-grid .badge {
   width: 100%;
   justify-content: center;
+}
+
+.external-auto-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 11px;
+  border: 1px solid #d4e3ec;
+  border-radius: 8px;
+  color: var(--muted);
+  background: #f7fbfd;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.external-auto-check.is-ok {
+  color: var(--primary);
+  background: #eefaf6;
+  border-color: #b9eadc;
+}
+
+.external-auto-check.is-pending {
+  color: #9a6200;
+  background: #fff3d8;
+  border-color: #ffd98d;
+}
+
+.external-auto-check svg {
+  width: 16px;
+  height: 16px;
+}
+
+.external-compliance-summary {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #d8e8f1;
+}
+
+.external-compliance-summary h4 {
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.external-compliance-table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid #c9dce8;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.external-compliance-table th,
+.external-compliance-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #d8e8f1;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.external-compliance-table th {
+  background: #f2f8fb;
+  color: #34536a;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.external-compliance-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.external-compliance-table .badge,
+.external-compliance-table .external-auto-check {
+  width: fit-content;
+  white-space: nowrap;
+}
+
+.external-360-upload {
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 420px);
+  gap: 18px;
+  align-items: center;
+  margin: 10px 0 18px;
+  padding: 16px;
+  border: 1px solid #b9eadc;
+  border-radius: 8px;
+  background: #f3fcf9;
+}
+
+.external-360-upload strong,
+.external-360-upload span {
+  display: block;
+}
+
+.external-360-upload span {
+  margin: 4px 0 8px;
+  color: var(--muted);
+}
+
+.external-360-upload input[type="file"] {
+  width: 100%;
 }
 
 .paste-capture {

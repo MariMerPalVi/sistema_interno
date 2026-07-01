@@ -138,7 +138,7 @@ class DatabaseSeeder extends Seeder
         foreach ([
             ['Consulta de procesos judiciales', 'https://procesosjudiciales.funcionjudicial.gob.ec/busqueda-filtros'],
             ['Certificado de antecedentes penales', 'https://certificados.ministeriodelinterior.gob.ec/gestorcertificados/antecedentes/'],
-            ['Plataforma REFLA', 'https://pjc.refla.org/refla-webapp/faces/login.xhtml'],
+            ['Coactiva', 'https://pjc.refla.org/refla-webapp/faces/login.xhtml'],
             ['Consulta de noticias del delito - Fiscalía', 'https://www.fiscalia.gob.ec/consulta-de-noticias-del-delito/'],
         ] as $index => [$name, $url]) {
             ExternalCheckItem::updateOrCreate(['url' => $url], [
@@ -148,6 +148,13 @@ class DatabaseSeeder extends Seeder
                 'sort_order' => $index + 1,
             ]);
         }
+
+        ExternalCheckItem::updateOrCreate(['url' => 'https://360.coop'], [
+            'name' => 'Sistema 360',
+            'is_required' => false,
+            'active' => true,
+            'sort_order' => 5,
+        ]);
 
         InternalDocumentTemplate::whereNull('account_type_id')
             ->where('source', '!=', 'servicio')

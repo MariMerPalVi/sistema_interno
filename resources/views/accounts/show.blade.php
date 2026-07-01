@@ -29,7 +29,13 @@
     $loadedRequirementIds = $opening->documents->where('document_scope', 'requisito')->whereIn('status', ['cargado', 'validado'])->pluck('account_type_requirement_id');
     $requirementsDocumentsComplete = $requiredRequirementIds->diff($loadedRequirementIds)->isEmpty();
     $requirementsComplete = $requirementsDocumentsComplete && $consentComplete;
-    $requiredExternalIds = $externalChecks->where('is_required', true)->pluck('id');
+    $system360Item = $externalChecks->first(fn ($item) => str_contains(strtolower($item->name), '360'));
+    $regularExternalChecks = $externalChecks->reject(fn ($item) => $system360Item && $item->id === $system360Item->id)->values();
+    $system360Evidence = $system360Item
+        ? $opening->externalEvidences->firstWhere('external_check_item_id', $system360Item->id)
+        : null;
+    $system360Selected = filled($system360Evidence?->screenshot_path);
+    $requiredExternalIds = $regularExternalChecks->where('is_required', true)->pluck('id');
     $externalComplete = collect(array_keys($externalSubjects))->every(function ($subjectKey) use ($opening, $requiredExternalIds) {
         $loadedExternalIds = $opening->externalEvidences
             ->where('subject_key', $subjectKey)
@@ -397,7 +403,7 @@
             <h2 class="panel-title"><i data-lucide="shield-check"></i> Lista de control externa</h2>
             <span class="hint">Pegue una evidencia por consulta. El sistema guardará un PDF consolidado por cada persona o entidad revisada.</span>
         </div>
-        <form class="external-evidence-form" method="post" action="{{ route('accounts.external.upload', $opening) }}">
+        <form class="external-evidence-form" method="post" action="{{ route('accounts.external.upload', $opening) }}" enctype="multipart/form-data">
             @csrf
             @if ($opening->accountType->slug === 'cuenta-juridica')
                 <label class="external-company-choice">
@@ -405,37 +411,59 @@
                     Realizar también la revisión de la empresa cuando aplique
                 </label>
             @endif
+            @if ($system360Item)
+                <label class="external-company-choice external-optional-choice">
+                    <input type="checkbox" name="include_system_360" value="1" @checked($system360Selected)>
+                    Incluir revisión en Sistema 360
+                </label>
+                <div class="external-360-upload" data-external-360-upload @hidden(!$system360Selected)>
+                    <div>
+                        <strong>Revisión 360</strong>
+                        <span>Adjunte el documento PDF emitido por el sistema 360. Se anexará al PDF consolidado de evidencias.</span>
+                        @if ($system360Evidence?->screenshot_path)
+                            @include('partials.badge', ['status' => 'cargado'])
+                        @else
+                            @include('partials.badge', ['status' => 'pendiente'])
+                        @endif
+                    </div>
+                    <input type="file" name="system_360_file" accept="application/pdf" data-has-evidence="{{ $system360Evidence?->screenshot_path ? '1' : '0' }}" @disabled(!$system360Selected)>
+                </div>
+            @endif
 
             @php
                 $displaySubjects = $externalSubjects;
                 if ($opening->accountType->slug === 'cuenta-juridica') {
                     $displaySubjects['empresa'] = 'Empresa';
                 }
+                $checksForSubject = $regularExternalChecks;
             @endphp
 
             @foreach ($displaySubjects as $subjectKey => $subjectLabel)
                 <section class="external-subject" data-external-subject="{{ $subjectKey }}" @hidden($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
                     <div class="external-subject-head">
                         <h3 class="subject-title"><i data-lucide="{{ $subjectKey === 'empresa' ? 'building-2' : 'user-round-check' }}"></i> Revisión: {{ $subjectLabel }}</h3>
-                        <span>Las cuatro evidencias se guardarán en un PDF consolidado.</span>
+                        <span>Las evidencias se guardarán en un PDF consolidado.</span>
                     </div>
                     <div class="external-grid">
-                        @foreach ($externalChecks as $item)
-                            @php $evidence = $externalDocs->get($subjectKey.'_'.$item->id); @endphp
-                            <div>
+                        @foreach ($checksForSubject as $item)
+                            @php
+                                $evidence = $externalDocs->get($subjectKey.'_'.$item->id);
+                                $isDisabled = $subjectKey === 'empresa' && !$companyExternalCheckApplicable;
+                            @endphp
+                            <div class="external-check-card">
                                 <h3>{{ $item->name }}</h3>
                                 <a class="doc-action external-link-action" href="{{ $item->url }}" target="_blank" rel="noopener" aria-label="Abrir enlace oficial" data-tooltip="Abrir enlace oficial">
                                     <i data-lucide="external-link"></i>
                                 </a>
                                 @include('partials.badge', ['status' => $evidence?->screenshot_path ? $evidence->result : 'pendiente'])
-                                <select name="results[{{ $subjectKey }}][{{ $item->id }}]" @disabled($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
+                                <select name="results[{{ $subjectKey }}][{{ $item->id }}]" @disabled($isDisabled)>
                                     <option value="sin_novedad" @selected(($evidence?->result ?? null) === 'sin_novedad')>Sin novedad</option>
                                     <option value="con_observacion" @selected(($evidence?->result ?? null) === 'con_observacion')>Con observación</option>
                                     <option value="no_aplica" @selected(($evidence?->result ?? null) === 'no_aplica')>No aplica</option>
                                     <option value="pendiente" @selected(($evidence?->result ?? 'pendiente') === 'pendiente')>Pendiente</option>
                                 </select>
-                                <input name="observations[{{ $subjectKey }}][{{ $item->id }}]" value="{{ $evidence?->advisor_observation }}" placeholder="Observación del asesor" @disabled($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
-                                <input type="hidden" name="evidence_images[{{ $subjectKey }}][{{ $item->id }}]" class="pasted-evidence-input" data-has-evidence="{{ $evidence?->screenshot_path ? '1' : '0' }}" @required(!$evidence?->screenshot_path) @disabled($subjectKey === 'empresa' && !$companyExternalCheckApplicable)>
+                                <input name="observations[{{ $subjectKey }}][{{ $item->id }}]" value="{{ $evidence?->advisor_observation }}" placeholder="Observación del asesor" @disabled($isDisabled)>
+                                <input type="hidden" name="evidence_images[{{ $subjectKey }}][{{ $item->id }}]" class="pasted-evidence-input" data-has-evidence="{{ $evidence?->screenshot_path ? '1' : '0' }}" @required(!$evidence?->screenshot_path) @disabled($isDisabled)>
                                 <div class="paste-capture compact-paste" tabindex="0">
                                     <i data-lucide="clipboard-paste" aria-hidden="true"></i>
                                     <span>{{ $evidence?->screenshot_path ? 'Pegar evidencia para reemplazar' : 'Pegar evidencia con Ctrl + V' }}</span>
@@ -443,6 +471,42 @@
                                 </div>
                             </div>
                         @endforeach
+                    </div>
+                    <div class="external-compliance-summary">
+                        <h4>Check list de lista de control</h4>
+                        <div class="table-wrap">
+                            <table class="external-compliance-table">
+                                <thead>
+                                    <tr>
+                                        <th>Consulta</th>
+                                        <th>Resultado</th>
+                                        <th>Estado de evidencia</th>
+                                        <th>Cumplimiento</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($checksForSubject as $item)
+                                        @php
+                                            $evidence = $externalDocs->get($subjectKey.'_'.$item->id);
+                                            $hasEvidence = filled($evidence?->screenshot_path);
+                                            $result = $evidence?->result ?? 'pendiente';
+                                            $complies = $hasEvidence && in_array($result, ['sin_novedad', 'con_observacion', 'no_aplica'], true);
+                                        @endphp
+                                        <tr>
+                                            <td>{{ $item->name }}</td>
+                                            <td>@include('partials.badge', ['status' => $result])</td>
+                                            <td>{{ $hasEvidence ? 'Evidencia cargada' : 'Pendiente de evidencia' }}</td>
+                                            <td>
+                                                <span @class(['external-auto-check', 'is-ok' => $complies, 'is-pending' => !$complies])>
+                                                    <i data-lucide="{{ $complies ? 'check-circle-2' : 'clock-3' }}"></i>
+                                                    {{ $complies ? 'Cumple' : 'Pendiente' }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
             @endforeach
